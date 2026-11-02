@@ -71,13 +71,57 @@ Run with `python scripts/inspect_schools.py`.
   are charters administered by districts outside the study area with a
   Redlands address.
 
-### Proposed processing criteria (Phase 2)
+### Processing criteria (Phase 2)
 
 - Filter: `City IN ('Redlands', 'Yucaipa')` and `Status = 'Active'`.
+- Add `in_city_limits` (point within the TIGER/Line boundary of its address
+  city). Records outside the limits are kept; see the comparison below.
 - Keep `Virtual = 'V'` records but flag them and exclude them from proximity analysis.
+
+Implemented in `scripts/prepare_schools.py`, which writes
+`data/processed/study_area.gpkg` (EPSG:26911) with two layers:
+
+| Layer | Features | Notes |
+|---|---|---|
+| `schools` | 37 | Selected source fields + `in_city_limits`, `proximity_eligible` |
+| `city_boundaries` | 2 | Redlands and Yucaipa from TIGER/Line 2026 |
+
+Record flow: 9,946 read → 9,909 excluded (`City`) → 0 excluded (`Status`) → 37 written.
+35 are `in_city_limits`, 33 are `proximity_eligible`.
 - Working CRS: **EPSG:26911** (NAD83 / UTM zone 11N, metres). EPSG:3857 is not
   suitable for distance measurement (≈0.83 true metres per unit at 34°N).
 
-## Pending sources
+## Municipal boundaries — TIGER/Line 2026 Places (California)
 
-- Municipal boundaries for Redlands and Yucaipa (not yet selected).
+| Item | Value |
+|---|---|
+| Publisher | U.S. Census Bureau |
+| URL | https://www2.census.gov/geo/tiger/TIGER2026/PLACE/tl_2026_06_place.zip |
+| Rights | Public domain (U.S. Government work) |
+| Server last-modified | 2026-10-06 |
+| Downloaded | 2026-11-02 |
+| Local file | `data/raw/tl_2026_06_place/` (not committed) |
+| SHA-256 (zip) | `4f1475be8db892b1d4894011846c5c857fe445bf876e470003170cd333d68032` |
+
+- 1,622 places, CRS **EPSG:4269** (NAD83 geographic)
+- Redlands city: `GEOID` 0659962, 93.86 km²; Yucaipa city: `GEOID` 0687042, 73.13 km²
+  (areas computed in EPSG:26911); both geometries valid
+- Selection: `NAME IN ('Redlands', 'Yucaipa')` and `LSAD = '25'` (city)
+- TIGER/Line boundaries are cartographic products for statistical use, not
+  legal survey boundaries.
+
+### Address city vs. city limits (active schools)
+
+| `City` (address) | Inside Redlands | Inside Yucaipa | Outside both |
+|---|---|---|---|
+| Redlands | 22 | 0 | 2 |
+| Yucaipa | 0 | 13 | 0 |
+
+No school with another address city falls inside either boundary.
+
+Outside city limits despite a Redlands address:
+
+| School | Distance to Redlands boundary |
+|---|---|
+| Mission Elementary (10568 California St.) | 89 m |
+| Redlands East Valley High (31000 East Colton Ave.) | 772 m |
