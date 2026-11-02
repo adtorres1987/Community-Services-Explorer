@@ -10,8 +10,8 @@ uvicorn app.main:app --app-dir backend --port 8010 --reload
 ```
 
 - Interactive docs (OpenAPI): http://localhost:8010/docs
-- Port 8010 is used because 8000 is taken by another local service.
-- Settings come from `.env`; `CORS_ORIGINS` lists the frontend origins allowed to call the API.
+- Settings come from `.env`. `CORS_ORIGINS` lists the frontend origins allowed
+  to call the API (default `http://localhost:5174`, the Vite dev server).
 
 In the Docker stack the API is not published directly: nginx serves it at
 http://localhost:8080/api (docs at http://localhost:8080/api/docs).

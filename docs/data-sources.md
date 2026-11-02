@@ -13,13 +13,16 @@
 | Update frequency | Irregular |
 | Created (catalog) | 2026-04-24 |
 | Last updated (catalog) | 2026-10-28 |
-| Downloaded | 2026-11-02 (GeoJSON resource) |
+| Download URL (GeoJSON) | https://gis.data.ca.gov/api/download/v1/items/0cab44bcfd9a44eb88197147e4d37e8b/geojson?layers=0 |
+| Downloaded | 2026-11-02 |
 | Local file | `data/raw/california-public-schools-2025-2026.geojson` (not committed) |
 | SHA-256 | `29d5af3991a2151c4e13d72726322f85bd9d098c556c4a4b09cbc965693e68af` |
 
-The raw GeoJSON is the original and must not be modified. A GeoPackage copy
-exported from QGIS (`data/raw/california_schools_2025_26.gpkg`) has identical
-geometries but drops the `OBJECTID` column; it is a convenience copy, not the source.
+Both raw sources are downloaded and checksum-verified by
+`python scripts/download_data.py` (see `data/README.md`). The raw GeoJSON is
+the original and must not be modified. A GeoPackage exported from it in QGIS
+during inspection has identical geometries but drops the `OBJECTID` column;
+it is not used by the pipeline.
 
 ### Inspection results
 
@@ -62,8 +65,8 @@ Run with `python scripts/inspect_schools.py`.
 
 - **`City` is an address attribute.** Redlands Unified also operates schools
   with Highland, Mentone and Loma Linda addresses, which this filter excludes.
-  A Yucaipa address may fall outside city limits. Validate against municipal
-  boundaries once a boundary source is chosen.
+  An address city does not guarantee the school is within city limits; see the
+  comparison with TIGER/Line boundaries below.
 - **Exclusively virtual schools are administrative locations.** The three
   Sage Oak Charter records share one point (1473 Ford St. Ste. #105, Redlands).
   Their location does not represent where students are served.
@@ -77,6 +80,8 @@ Run with `python scripts/inspect_schools.py`.
 - Add `in_city_limits` (point within the TIGER/Line boundary of its address
   city). Records outside the limits are kept; see the comparison below.
 - Keep `Virtual = 'V'` records but flag them and exclude them from proximity analysis.
+- Working CRS: **EPSG:26911** (NAD83 / UTM zone 11N, metres). EPSG:3857 is not
+  suitable for distance measurement (≈0.83 true metres per unit at 34°N).
 
 Implemented in `scripts/prepare_schools.py`, which writes
 `data/processed/study_area.gpkg` (EPSG:26911) with two layers:
@@ -87,9 +92,8 @@ Implemented in `scripts/prepare_schools.py`, which writes
 | `city_boundaries` | 2 | Redlands and Yucaipa from TIGER/Line 2026 |
 
 Record flow: 9,946 read → 9,909 excluded (`City`) → 0 excluded (`Status`) → 37 written.
-35 are `in_city_limits`, 33 are `proximity_eligible`.
-- Working CRS: **EPSG:26911** (NAD83 / UTM zone 11N, metres). EPSG:3857 is not
-  suitable for distance measurement (≈0.83 true metres per unit at 34°N).
+35 are `in_city_limits`, 33 are `proximity_eligible`. The GeoPackage is
+committed to the repository; `tests/test_processed_data.py` checks these counts.
 
 ## Municipal boundaries — TIGER/Line 2026 Places (California)
 

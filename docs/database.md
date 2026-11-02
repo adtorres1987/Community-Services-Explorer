@@ -3,7 +3,7 @@
 ## Setup
 
 ```bash
-cp .env.example .env              # then set POSTGRES_PASSWORD
+cp .env.example .env              # optionally change POSTGRES_PASSWORD
 docker compose up -d --wait db    # applies database/migrations on first start
 python scripts/load_postgis.py    # loads data/processed/study_area.gpkg
 ```
@@ -13,7 +13,8 @@ one-shot `loader` service.
 
 - Image: `imresamu/postgis:17-3.5` (PostgreSQL 17, PostGIS 3.5). It is a
   multi-arch build of the official image; `postgis/postgis` has no arm64 build.
-- Port: `127.0.0.1:5434` (5432 and 5433 were already in use locally).
+- Port: `127.0.0.1:5434` by default (`POSTGRES_PORT` in `.env`), to avoid
+  clashing with a local PostgreSQL on 5432.
 - Migrations in `database/migrations/` run only when the data volume is empty.
   To recreate the database from scratch: `docker compose down -v`, then start again.
 - `load_postgis.py` replaces the rows of each source inside one transaction
@@ -78,4 +79,5 @@ Verified results (2026-11-02):
   Schools just outside the cities (Highland, Mentone, Loma Linda, Calimesa)
   are not, so coverage near city edges is underestimated.
 - Radii are straight-line distances. They do not measure street access,
-  capacity or enrolment boundaries.
+  capacity or enrolment boundaries. See
+  [analysis-limitations.md](analysis-limitations.md) for the full list.

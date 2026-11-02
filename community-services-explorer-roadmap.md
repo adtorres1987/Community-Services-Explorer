@@ -2,12 +2,39 @@
 
 ## Plan de implementación por fases
 
-**Versión:** 1.0\
-**Estado:** Plan inicial\
+**Versión:** 1.1\
+**Estado:** MVP completado (fases 0--6). Pendiente: video demostrativo y
+demo pública.\
+**Última actualización:** 2026-11-02\
 **Área de estudio:** Yucaipa y Redlands, California\
 **Dedicación estimada:** 4--5 horas por semana\
 **Objetivo:** construir un proyecto GIS demostrable para un portafolio
 de GIS Developer / Geospatial Software Engineer.
+
+------------------------------------------------------------------------
+
+## Estado de implementación (2026-11-02)
+
+Repositorio: https://github.com/adtorres1987/Community-Services-Explorer
+
+Diferencias respecto al plan original:
+
+-   El repositorio local está en `~/dev/gis-app-web`, no en
+    `~/Developer/community-services-explorer`.
+-   Python 3.14 (Homebrew): el Python del sistema (3.9) es demasiado
+    antiguo para GeoPandas 1.x.
+-   La imagen de PostGIS es `imresamu/postgis:17-3.5` (multiarquitectura),
+    porque `postgis/postgis` no tiene versión para arm64.
+-   Se añadieron los campos `in_city_limits` y `proximity_eligible`, y el
+    campo genérico `attributes` (JSONB) en `facilities`.
+-   La proximidad se presenta como porcentaje del área de cada ciudad a
+    500 m / 1 km de una escuela (`/analysis/proximity`).
+-   Se agregaron un script de descarga con verificación de checksum, el
+    GeoPackage procesado en el repositorio, Docker Compose completo
+    (db, carga, API, frontend con nginx) e integración continua con
+    GitHub Actions.
+
+Documentación técnica: `README.md` y `docs/`.
 
 ------------------------------------------------------------------------
 
@@ -174,15 +201,15 @@ decida expresamente incluir una muestra pequeña y redistribuible.
 
 ### Tareas
 
--   [ ] Confirmar versión de macOS y arquitectura Apple Silicon.
--   [ ] Confirmar que QGIS abre correctamente.
--   [ ] Verificar `python3 --version`.
--   [ ] Verificar `git --version`.
--   [ ] Verificar que Docker Desktop inicia correctamente.
--   [ ] Crear el repositorio local.
--   [ ] Crear un entorno virtual Python independiente.
--   [ ] Crear `.gitignore`.
--   [ ] Crear el primer commit.
+-   [x] Confirmar versión de macOS y arquitectura Apple Silicon.
+-   [x] Confirmar que QGIS abre correctamente.
+-   [x] Verificar `python3 --version`.
+-   [x] Verificar `git --version`.
+-   [x] Verificar que Docker Desktop inicia correctamente.
+-   [x] Crear el repositorio local.
+-   [x] Crear un entorno virtual Python independiente.
+-   [x] Crear `.gitignore`.
+-   [x] Crear el primer commit.
 
 ### Comandos iniciales
 
@@ -240,16 +267,16 @@ cobertura y sistema de coordenadas antes de procesar.
 
 ### Tareas
 
--   [ ] Descargar el dataset oficial.
--   [ ] Guardar el archivo original en `data/raw/`.
--   [ ] Registrar URL, fecha de descarga y licencia.
--   [ ] Abrir el archivo en QGIS.
--   [ ] Identificar los campos que representan nombre, ciudad, tipo,
+-   [x] Descargar el dataset oficial.
+-   [x] Guardar el archivo original en `data/raw/`.
+-   [x] Registrar URL, fecha de descarga y licencia.
+-   [x] Abrir el archivo en QGIS.
+-   [x] Identificar los campos que representan nombre, ciudad, tipo,
     estado y ubicación.
--   [ ] Confirmar cómo están representadas Yucaipa y Redlands en los
+-   [x] Confirmar cómo están representadas Yucaipa y Redlands en los
     atributos.
--   [ ] Revisar cantidad de registros y geometrías nulas o vacías.
--   [ ] Registrar dudas sobre calidad y cobertura.
+-   [x] Revisar cantidad de registros y geometrías nulas o vacías.
+-   [x] Registrar dudas sobre calidad y cobertura.
 
 ### Criterios de aceptación
 
@@ -267,18 +294,18 @@ cobertura y sistema de coordenadas antes de procesar.
 
 ### Tareas
 
--   [ ] Crear `scripts/inspect_schools.py`.
--   [ ] Inspeccionar columnas, tipos de datos y CRS.
--   [ ] Medir valores faltantes y geometrías vacías.
--   [ ] Identificar registros duplicados.
--   [ ] Confirmar el campo y los valores utilizados para filtrar
+-   [x] Crear `scripts/inspect_schools.py`.
+-   [x] Inspeccionar columnas, tipos de datos y CRS.
+-   [x] Medir valores faltantes y geometrías vacías.
+-   [x] Identificar registros duplicados.
+-   [x] Confirmar el campo y los valores utilizados para filtrar
     ciudades.
--   [ ] Filtrar escuelas de Yucaipa y Redlands.
--   [ ] Validar geometrías.
--   [ ] Transformar a un CRS proyectado adecuado para mediciones en
+-   [x] Filtrar escuelas de Yucaipa y Redlands.
+-   [x] Validar geometrías.
+-   [x] Transformar a un CRS proyectado adecuado para mediciones en
     metros.
--   [ ] Exportar los datos limpios a GeoPackage.
--   [ ] Abrir el resultado en QGIS y comprobarlo visualmente.
+-   [x] Exportar los datos limpios a GeoPackage.
+-   [x] Abrir el resultado en QGIS y comprobarlo visualmente.
 
 ### Reglas
 
@@ -306,14 +333,14 @@ cobertura y sistema de coordenadas antes de procesar.
 
 ### Tareas
 
--   [ ] Definir el modelo de datos mínimo.
--   [ ] Crear PostgreSQL y PostGIS mediante Docker Compose.
--   [ ] Crear la base de datos `community_services`.
--   [ ] Crear una tabla de instalaciones.
--   [ ] Importar las escuelas procesadas.
--   [ ] Crear índices espaciales GiST.
--   [ ] Verificar geometrías y SRID.
--   [ ] Probar consultas espaciales.
+-   [x] Definir el modelo de datos mínimo.
+-   [x] Crear PostgreSQL y PostGIS mediante Docker Compose.
+-   [x] Crear la base de datos `community_services`.
+-   [x] Crear una tabla de instalaciones.
+-   [x] Importar las escuelas procesadas.
+-   [x] Crear índices espaciales GiST.
+-   [x] Verificar geometrías y SRID.
+-   [x] Probar consultas espaciales.
 
 ### Modelo inicial sugerido
 
@@ -380,14 +407,14 @@ Parámetros previstos para proximidad:
 
 ### Tareas
 
--   [ ] Crear aplicación FastAPI.
--   [ ] Configurar conexión a PostGIS.
--   [ ] Definir esquemas de respuesta.
--   [ ] Implementar validación de parámetros.
--   [ ] Devolver geometrías en GeoJSON cuando corresponda.
--   [ ] Manejar errores y respuestas HTTP.
--   [ ] Probar endpoints.
--   [ ] Documentar API mediante OpenAPI.
+-   [x] Crear aplicación FastAPI.
+-   [x] Configurar conexión a PostGIS.
+-   [x] Definir esquemas de respuesta.
+-   [x] Implementar validación de parámetros.
+-   [x] Devolver geometrías en GeoJSON cuando corresponda.
+-   [x] Manejar errores y respuestas HTTP.
+-   [x] Probar endpoints.
+-   [x] Documentar API mediante OpenAPI.
 
 ### Criterios de aceptación
 
@@ -421,14 +448,14 @@ frontend/src/
 
 ### Funcionalidades
 
--   [ ] Mostrar un mapa centrado en el área de estudio.
--   [ ] Visualizar escuelas como marcadores.
--   [ ] Mostrar nombre y atributos en un popup.
--   [ ] Filtrar por ciudad.
--   [ ] Filtrar por tipo de instalación.
--   [ ] Consultar radios de 500 y 1.000 metros.
--   [ ] Mostrar estadísticas por ciudad.
--   [ ] Manejar estados de carga y errores.
+-   [x] Mostrar un mapa centrado en el área de estudio.
+-   [x] Visualizar escuelas como marcadores.
+-   [x] Mostrar nombre y atributos en un popup.
+-   [x] Filtrar por ciudad.
+-   [x] Filtrar por tipo de instalación.
+-   [x] Consultar radios de 500 y 1.000 metros.
+-   [x] Mostrar estadísticas por ciudad.
+-   [x] Manejar estados de carga y errores.
 
 ### Criterios de aceptación
 
@@ -447,16 +474,16 @@ frontend/src/
 
 ### Tareas
 
--   [ ] Escribir pruebas para el procesamiento de datos.
--   [ ] Probar endpoints.
--   [ ] Verificar consultas espaciales con casos conocidos.
--   [ ] Configurar Docker Compose para el entorno completo.
--   [ ] Documentar instalación y ejecución.
--   [ ] Documentar fuentes y licencias.
--   [ ] Documentar limitaciones del análisis.
--   [ ] Crear capturas de pantalla.
+-   [x] Escribir pruebas para el procesamiento de datos.
+-   [x] Probar endpoints.
+-   [x] Verificar consultas espaciales con casos conocidos.
+-   [x] Configurar Docker Compose para el entorno completo.
+-   [x] Documentar instalación y ejecución.
+-   [x] Documentar fuentes y licencias.
+-   [x] Documentar limitaciones del análisis.
+-   [x] Crear capturas de pantalla.
 -   [ ] Crear un video demostrativo breve.
--   [ ] Publicar el repositorio en GitHub.
+-   [x] Publicar el repositorio en GitHub.
 -   [ ] Publicar una demo si el presupuesto y las condiciones de
     alojamiento lo permiten.
 
@@ -551,15 +578,15 @@ Debe cumplir lo siguiente cuando corresponda:
 **Objetivo:** dejar listo el repositorio y confirmar que el dataset
 oficial puede procesarse.
 
--   [ ] Crear estructura de carpetas.
--   [ ] Inicializar Git.
--   [ ] Crear y activar `.venv`.
--   [ ] Instalar dependencias de procesamiento.
--   [ ] Descargar California Public Schools 2025--26.
--   [ ] Abrir el archivo en QGIS.
--   [ ] Ejecutar un script de inspección.
--   [ ] Registrar nombres reales de campos, CRS y cantidad de registros.
--   [ ] Documentar resultados en `docs/data-sources.md`.
+-   [x] Crear estructura de carpetas.
+-   [x] Inicializar Git.
+-   [x] Crear y activar `.venv`.
+-   [x] Instalar dependencias de procesamiento.
+-   [x] Descargar California Public Schools 2025--26.
+-   [x] Abrir el archivo en QGIS.
+-   [x] Ejecutar un script de inspección.
+-   [x] Registrar nombres reales de campos, CRS y cantidad de registros.
+-   [x] Documentar resultados en `docs/data-sources.md`.
 
 ### Script inicial de inspección
 
@@ -603,12 +630,22 @@ python scripts/inspect_schools.py
 
 ## 11. Decisiones pendientes antes de avanzar
 
-1.  Confirmar los campos reales del dataset.
-2.  Confirmar que existen registros para ambas ciudades.
-3.  Elegir el CRS de análisis.
-4.  Confirmar la fuente de límites municipales.
+Todas resueltas (detalle en `docs/data-sources.md`):
+
+1.  Confirmar los campos reales del dataset. **Resuelto:** `CDSCode`,
+    `SchoolName`, `City`, `SchoolType`, `Status`, `Virtual`, etc.
+2.  Confirmar que existen registros para ambas ciudades. **Resuelto:**
+    24 escuelas activas en Redlands y 13 en Yucaipa.
+3.  Elegir el CRS de análisis. **Resuelto:** EPSG:26911 (NAD83 / UTM
+    zona 11N, metros).
+4.  Confirmar la fuente de límites municipales. **Resuelto:** Census
+    TIGER/Line 2026 Places. Se mantiene el filtro por ciudad de la
+    dirección y se marca `in_city_limits` (2 escuelas de Redlands quedan
+    fuera del límite).
 5.  Definir si se incluirán únicamente escuelas públicas o también otras
-    instalaciones educativas.
+    instalaciones educativas. **Resuelto:** solo escuelas públicas
+    activas (dataset del CDE); las exclusivamente virtuales se excluyen
+    del análisis de proximidad.
 
 **Regla principal:** primero datos correctos, después análisis espacial,
 luego API y finalmente interfaz web. No construir capas de software

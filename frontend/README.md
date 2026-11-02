@@ -4,17 +4,22 @@ React + TypeScript + Vite, with Leaflet / React-Leaflet for the map.
 
 ## Run
 
-Requires the API on http://localhost:8010 (see `docs/api.md`).
+Requires Node.js 24+ and the API on http://localhost:8010 (see `docs/api.md`).
 
 ```bash
 npm install
 npm run dev      # http://localhost:5174
-npm run build    # type-check and production build
+npm test         # Vitest + Testing Library
 npm run lint     # oxlint
+npm run build    # type-check and production build
 ```
 
 Set `VITE_API_URL` in `.env.local` to use another API address (see `.env.example`).
-Port 5174 must be listed in the API's `CORS_ORIGINS`.
+Port 5174 must be listed in the API's `CORS_ORIGINS` (it is the default).
+
+In Docker (`docker compose up` from the repository root), the `Dockerfile`
+builds the app with `VITE_API_URL=/api` and serves it with nginx, which proxies
+`/api` to the API container (`nginx.conf`).
 
 ## Structure
 
@@ -27,8 +32,11 @@ src/
 ├── services/
 │   ├── api.ts                  typed API client (mirrors backend schemas)
 │   └── useRequest.ts           fetch hook with abort, loading, error and retry
+├── test/                       test setup and fixtures
 └── App.tsx                     filter state and layout
 ```
+
+Tests sit next to the code they cover (`*.test.ts`, `*.test.tsx`).
 
 ## Notes
 

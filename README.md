@@ -137,7 +137,9 @@ Field descriptions, checksums and processing criteria: [docs/data-sources.md](do
 - [Database model and spatial queries](docs/database.md)
 - [API reference](docs/api.md)
 - [Analysis limitations](docs/analysis-limitations.md)
-- [Original project plan (Spanish)](community-services-explorer-roadmap.md)
+- [Development environment](docs/environment.md)
+- [Data folder](data/README.md) and [frontend](frontend/README.md) notes
+- [Project plan and status (Spanish)](community-services-explorer-roadmap.md)
 
 ## Next steps
 
