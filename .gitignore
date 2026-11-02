@@ -15,6 +15,8 @@ data/raw/*
 data/processed/*
 !data/raw/.gitkeep
 !data/processed/.gitkeep
+# Small, redistributable processed dataset so the app runs without downloading
+!data/processed/study_area.gpkg
 
 # QGIS temporary and backup files
 *.qgz~

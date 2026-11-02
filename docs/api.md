@@ -13,6 +13,9 @@ uvicorn app.main:app --app-dir backend --port 8010 --reload
 - Port 8010 is used because 8000 is taken by another local service.
 - Settings come from `.env`; `CORS_ORIGINS` lists the frontend origins allowed to call the API.
 
+In the Docker stack the API is not published directly: nginx serves it at
+http://localhost:8080/api (docs at http://localhost:8080/api/docs).
+
 ## Endpoints
 
 All geometries are GeoJSON in **EPSG:4326**. Distances are computed in EPSG:26911 (metres).
@@ -68,7 +71,7 @@ clipped to the city boundary and returned as `coverage` geometry.
 Integration tests run against the loaded PostGIS container:
 
 ```bash
-python -m pytest
+python -m pytest backend/tests
 ```
 
 They check record counts, WGS84 coordinates, filters, error codes, and that

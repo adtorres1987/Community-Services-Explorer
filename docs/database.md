@@ -3,11 +3,13 @@
 ## Setup
 
 ```bash
-cp .env.example .env          # then set POSTGRES_PASSWORD
-docker compose up -d --wait   # applies database/migrations on first start
-python scripts/prepare_schools.py
-python scripts/load_postgis.py
+cp .env.example .env              # then set POSTGRES_PASSWORD
+docker compose up -d --wait db    # applies database/migrations on first start
+python scripts/load_postgis.py    # loads data/processed/study_area.gpkg
 ```
+
+`docker compose up -d --build` (the full stack) runs the same load in the
+one-shot `loader` service.
 
 - Image: `imresamu/postgis:17-3.5` (PostgreSQL 17, PostGIS 3.5). It is a
   multi-arch build of the official image; `postgis/postgis` has no arm64 build.

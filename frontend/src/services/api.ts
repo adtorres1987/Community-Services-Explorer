@@ -1,7 +1,8 @@
 // Types mirror the Pydantic schemas in backend/app/schemas.
 import type { FeatureCollection, MultiPolygon, Point, Polygon } from 'geojson'
 
-const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8010'
+// Absolute URL in development; '/api' (same origin, proxied by nginx) in the Docker build
+const API_URL = (import.meta.env.VITE_API_URL ?? 'http://localhost:8010').replace(/\/$/, '')
 
 export interface SchoolAttributes {
   SchoolLevel: string | null
@@ -69,7 +70,7 @@ export class ApiError extends Error {
 type Params = Record<string, string | number | null | undefined>
 
 async function getJson<T>(path: string, params: Params, signal: AbortSignal): Promise<T> {
-  const url = new URL(path, API_URL)
+  const url = new URL(API_URL + path, window.location.origin)
   for (const [key, value] of Object.entries(params)) {
     if (value !== null && value !== undefined) url.searchParams.set(key, String(value))
   }
