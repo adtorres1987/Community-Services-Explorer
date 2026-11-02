@@ -23,7 +23,7 @@ All geometries are GeoJSON in **EPSG:4326**. Distances are computed in EPSG:2691
 | GET | `/facilities` | `city`, `facility_type`, `facility_subtype` (all optional) | FeatureCollection of facilities |
 | GET | `/facilities/{id}` | `id` ≥ 1 | Feature |
 | GET | `/cities` | — | FeatureCollection of city boundaries with area and facility count |
-| GET | `/analysis/proximity` | `radius_m` (100–2000, required), `city`, `facility_type` | Coverage per city |
+| GET | `/analysis/proximity` | `radius_m` (100–2000, required), `city`, `facility_type`, `facility_subtype` | Coverage per city |
 
 ### `/analysis/proximity`
 
@@ -35,6 +35,7 @@ clipped to the city boundary and returned as `coverage` geometry.
 {
   "radius_m": 1000,
   "facility_type": null,
+  "facility_subtype": null,
   "method": "Straight-line (Euclidean) distance measured in EPSG:26911. ...",
   "results": [
     {

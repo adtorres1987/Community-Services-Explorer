@@ -1,0 +1,116 @@
+// Types mirror the Pydantic schemas in backend/app/schemas.
+import type { FeatureCollection, MultiPolygon, Point, Polygon } from 'geojson'
+
+const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8010'
+
+export interface SchoolAttributes {
+  SchoolLevel: string | null
+  GradeLow: string | null
+  GradeHigh: string | null
+  Charter: string | null
+  Virtual: string | null
+  DistrictName: string | null
+  Street: string | null
+  Zip: string | null
+  Website: string | null
+  EnrollTotal: number | null
+}
+
+export interface FacilityProperties {
+  id: number
+  name: string
+  facility_type: string
+  facility_subtype: string | null
+  city: string
+  in_city_limits: boolean
+  proximity_eligible: boolean
+  attributes: SchoolAttributes
+}
+
+export type FacilityCollection = FeatureCollection<Point, FacilityProperties>
+
+export interface CityProperties {
+  name: string
+  geoid: string
+  area_km2: number
+  facility_count: number
+}
+
+export type CityCollection = FeatureCollection<MultiPolygon, CityProperties>
+
+export interface CityProximity {
+  city: string
+  city_area_km2: number
+  eligible_facilities: number
+  excluded_facilities: number
+  covered_area_km2: number
+  covered_pct: number
+  coverage: Polygon | MultiPolygon | null
+}
+
+export interface ProximityResponse {
+  radius_m: number
+  facility_type: string | null
+  facility_subtype: string | null
+  method: string
+  results: CityProximity[]
+}
+
+export class ApiError extends Error {
+  status: number | undefined
+
+  constructor(message: string, status?: number) {
+    super(message)
+    this.name = 'ApiError'
+    this.status = status
+  }
+}
+
+type Params = Record<string, string | number | null | undefined>
+
+async function getJson<T>(path: string, params: Params, signal: AbortSignal): Promise<T> {
+  const url = new URL(path, API_URL)
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== null && value !== undefined) url.searchParams.set(key, String(value))
+  }
+
+  let response: Response
+  try {
+    response = await fetch(url, { signal })
+  } catch (error) {
+    if (signal.aborted) throw error
+    throw new ApiError(`Cannot reach the API at ${API_URL}. Is it running?`)
+  }
+
+  if (!response.ok) {
+    let detail = `${response.status} ${response.statusText}`
+    try {
+      const body = await response.json()
+      if (typeof body.detail === 'string') detail = body.detail
+    } catch {
+      // Keep the status text when the body is not JSON
+    }
+    throw new ApiError(detail, response.status)
+  }
+  return response.json() as Promise<T>
+}
+
+export function fetchCities(signal: AbortSignal) {
+  return getJson<CityCollection>('/cities', {}, signal)
+}
+
+export function fetchFacilities(signal: AbortSignal) {
+  return getJson<FacilityCollection>('/facilities', { facility_type: 'school' }, signal)
+}
+
+export function fetchProximity(
+  radiusM: number,
+  facilitySubtype: string | null,
+  signal: AbortSignal,
+) {
+  return getJson<ProximityResponse>(
+    '/analysis/proximity',
+    { radius_m: radiusM, facility_type: 'school', facility_subtype: facilitySubtype },
+    signal,
+  )
+}

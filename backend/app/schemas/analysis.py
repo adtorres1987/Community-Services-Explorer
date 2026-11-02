@@ -16,5 +16,6 @@ class CityProximity(BaseModel):
 class ProximityResponse(BaseModel):
     radius_m: int
     facility_type: str | None
+    facility_subtype: str | None
     method: str
     results: list[CityProximity]

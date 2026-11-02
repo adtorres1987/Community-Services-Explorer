@@ -21,6 +21,7 @@ WITH per_city AS (
     LEFT JOIN facilities f
         ON f.city = b.name
        AND (%(facility_type)s::text IS NULL OR f.facility_type = %(facility_type)s)
+       AND (%(facility_subtype)s::text IS NULL OR f.facility_subtype = %(facility_subtype)s)
     WHERE (%(city)s::text IS NULL OR b.name = %(city)s)
     GROUP BY b.id
 ),
@@ -45,10 +46,16 @@ def proximity(
     city: str | None,
     radius_m: int,
     facility_type: str | None,
+    facility_subtype: str | None,
 ) -> ProximityResponse:
     rows = conn.execute(
         PROXIMITY_SQL,
-        {"city": city, "radius_m": radius_m, "facility_type": facility_type},
+        {
+            "city": city,
+            "radius_m": radius_m,
+            "facility_type": facility_type,
+            "facility_subtype": facility_subtype,
+        },
     ).fetchall()
     results = [
         CityProximity(
@@ -63,5 +70,9 @@ def proximity(
         for row in rows
     ]
     return ProximityResponse(
-        radius_m=radius_m, facility_type=facility_type, method=METHOD, results=results
+        radius_m=radius_m,
+        facility_type=facility_type,
+        facility_subtype=facility_subtype,
+        method=METHOD,
+        results=results,
     )

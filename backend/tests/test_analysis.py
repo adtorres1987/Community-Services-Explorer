@@ -42,6 +42,20 @@ def test_type_without_facilities_has_no_coverage(client):
     assert result["coverage"] is None
 
 
+def test_filter_by_subtype(client):
+    body = client.get(
+        "/analysis/proximity",
+        params={"city": "Redlands", "radius_m": 1000, "facility_subtype": "High"},
+    ).json()
+    [result] = body["results"]
+    assert body["facility_subtype"] == "High"
+    assert result["eligible_facilities"] == 4
+    all_types = client.get(
+        "/analysis/proximity", params={"city": "Redlands", "radius_m": 1000}
+    ).json()["results"][0]
+    assert 0 < result["covered_pct"] < all_types["covered_pct"]
+
+
 @pytest.mark.parametrize("radius_m", [50, 5000, "abc"])
 def test_invalid_radius_returns_422(client, radius_m):
     response = client.get("/analysis/proximity", params={"radius_m": radius_m})
