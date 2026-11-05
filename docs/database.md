@@ -15,10 +15,17 @@ one-shot `loader` service.
   multi-arch build of the official image; `postgis/postgis` has no arm64 build.
 - Port: `127.0.0.1:5434` by default (`POSTGRES_PORT` in `.env`), to avoid
   clashing with a local PostgreSQL on 5432.
-- Migrations in `database/migrations/` run only when the data volume is empty.
-  To recreate the database from scratch: `docker compose down -v`, then start again.
+- Migrations in `database/migrations/` run in order, only when the data volume
+  is empty. To recreate the database: `docker compose down -v`, then start again.
+  To upgrade an existing database instead, run the new migration with `psql`
+  (each migration after 001 is wrapped in a transaction), then reload the data.
 - `load_postgis.py` replaces the rows of each source inside one transaction
   and fails if the loaded row counts differ from the GeoPackage, so it can be re-run.
+
+| Migration | Change |
+|---|---|
+| `001_create_tables.sql` | `facilities` and `city_boundaries` (first MVP: Redlands and Yucaipa) |
+| `002_study_places_population.sql` | Assignment by boundary (`city` nullable, `address_city`, `in_city_limits` → `in_study_area`), place type and population on boundaries, `population_units` table |
 
 ## Data model
 
@@ -35,18 +42,26 @@ transforms to EPSG:4326 for GeoJSON output.
 | `name` | `TEXT` | |
 | `facility_type` | `TEXT` | `school` |
 | `facility_subtype` | `TEXT` | CDE `SchoolType` (Elementary, High, …) |
-| `city` | `TEXT` | Address city |
-| `in_city_limits` | `BOOLEAN` | Point within the address city's boundary |
+| `city` | `TEXT` | Study place whose boundary contains the facility; `NULL` for context facilities |
+| `address_city` | `TEXT` | Mailing-address city from the source |
+| `in_study_area` | `BOOLEAN` | `false` for context facilities (within 2 km, coverage only); `CHECK (in_study_area = (city IS NOT NULL))` |
 | `proximity_eligible` | `BOOLEAN` | `false` for exclusively virtual schools |
-| `attributes` | `JSONB` | Source-specific fields (level, grades, charter, district, address, website, enrolment) |
+| `attributes` | `JSONB` | Source-specific fields (level, grades, charter, district, address, county, website, enrolment) |
 | `geom` | `geometry(Point, 26911)` | GiST index |
 
-**`city_boundaries`** — `geoid`, `name`, `source_name`, `geom geometry(MultiPolygon, 26911)` with GiST index.
+**`city_boundaries`** — one row per study place: `geoid`, `name`, `place_type`
+(`city` or `CDP`), `population` (2020), `source_name`,
+`geom geometry(MultiPolygon, 26911)` with GiST index.
+
+**`population_units`** — 2020 census blocks clipped to each place: `geoid20`,
+`city` (references `city_boundaries.name`), `population` (apportioned by area,
+fractional), `source_name`, `geom geometry(MultiPolygon, 26911)` with GiST index.
 
 ## Spatial queries
 
 `database/sql/spatial_queries.sql` exercises `ST_Intersects`, `ST_DWithin`,
-`ST_Buffer`, `ST_Distance` and `ST_Transform`. Run it with:
+`ST_Buffer`, `ST_Union`, `ST_Intersection`, `ST_Distance` and `ST_Transform`.
+Run it with:
 
 ```bash
 docker compose exec -T db sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB"' < database/sql/spatial_queries.sql
@@ -54,30 +69,34 @@ docker compose exec -T db sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB"' < d
 
 Verified results (2026-11-02):
 
-- Both geometry columns report SRID 26911; both GiST indexes exist.
-- `ST_Intersects` finds 22 schools in Redlands and 13 in Yucaipa, matching
-  `in_city_limits`. Mission Elementary (89 m) and Redlands East Valley High
-  (772 m) lie outside Redlands, matching the Phase 2 comparison.
+- All geometry columns report SRID 26911; all GiST indexes exist.
+- `ST_Intersects` counts per boundary match the assigned `city` for all nine places.
+- Context schools lie between 40 m and 2 km from the study area.
 - Projected (UTM) and geodesic distances agree to the metre at this scale.
-- Share of city area within a radius of an eligible school:
+- Coverage (any eligible school, including neighbouring places and context schools):
 
-| City | 500 m | 1 km |
-|---|---|---|
-| Redlands (93.86 km²) | 12.9 % | 38.8 % |
-| Yucaipa (73.13 km²) | 11.1 % | 34.7 % |
+| Place | Area 500 m | Area 1 km | Residents 500 m | Residents 1 km |
+|---|---|---|---|---|
+| Colton | 20.1 % | 52.9 % | 37.7 % | 84.8 % |
+| Grand Terrace | 29.2 % | 76.0 % | 36.7 % | 90.4 % |
+| Highland | 16.1 % | 41.4 % | 41.8 % | 83.5 % |
+| Loma Linda | 6.5 % | 25.9 % | 10.1 % | 28.7 % |
+| Mentone | 10.5 % | 30.1 % | 33.8 % | 68.9 % |
+| Redlands | 13.0 % | 39.6 % | 24.2 % | 74.8 % |
+| Rialto | 28.1 % | 65.7 % | 47.5 % | 94.9 % |
+| San Bernardino | 26.1 % | 58.2 % | 45.2 % | 88.3 % |
+| Yucaipa | 11.1 % | 35.3 % | 22.1 % | 59.4 % |
 
-  An independent GeoPandas calculation gives the same values within 0.1
-  points (buffer segment approximation differs).
+  An independent GeoPandas calculation from the GeoPackage (same buffer
+  resolution) gives identical values for area, population and the number of
+  contributing schools.
 
-## Notes for the analysis
+## Performance
 
-- **Co-located schools.** Gorman Learning Center and Gorman Learning Center
-  San Bernardino/Santa Clarita are 1 m apart; Green Valley High and Green
-  Valley Independent Study are 4 m apart. Counts of "schools within a radius"
-  count each record, not each site.
-- **Edge effect.** Only schools with a Redlands or Yucaipa address are loaded.
-  Schools just outside the cities (Highland, Mentone, Loma Linda, Calimesa)
-  are not, so coverage near city edges is underestimated.
-- Radii are straight-line distances. They do not measure street access,
-  capacity or enrolment boundaries. See
-  [analysis-limitations.md](analysis-limitations.md) for the full list.
+`/analysis/proximity` for all nine places runs in 0.6–0.8 s on a laptop
+(buffer union, clip to boundaries, then area-weighted sum over ~6,800
+population units using the GiST indexes); the response is 160–235 KB with
+coverage geometry.
+
+See [analysis-limitations.md](analysis-limitations.md) for what these numbers
+do and do not measure.

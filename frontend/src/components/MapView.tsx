@@ -15,6 +15,8 @@ import { FacilityPopup } from './FacilityPopup'
 interface Props {
   cities: CityCollection | undefined
   facilities: FacilityCollection['features']
+  /** Facilities drawn at full strength; the others are faded */
+  focusedIds: Set<number>
   coverage: CityProximity[]
   selectedCity: string | null
 }
@@ -35,13 +37,15 @@ function FitToCities({ cities, selectedCity }: { cities: CityCollection; selecte
   return null
 }
 
-export function MapView({ cities, facilities, coverage, selectedCity }: Props) {
+export function MapView({ cities, facilities, focusedIds, coverage, selectedCity }: Props) {
   return (
     <MapContainer
       center={INITIAL_CENTER}
       zoom={INITIAL_ZOOM}
+      // Fractional zoom lets fitBounds fill narrow (mobile) maps instead of jumping a level out
+      zoomSnap={0.25}
       className="map"
-      aria-label="Map of schools in Redlands and Yucaipa"
+      aria-label="Map of schools in the study communities"
     >
       <TileLayer {...BASEMAP} />
 
@@ -69,16 +73,18 @@ export function MapView({ cities, facilities, coverage, selectedCity }: Props) {
         const [lon, lat] = facility.geometry.coordinates
         const color = CATEGORY_COLORS[schoolCategory(facility.properties.facility_subtype)]
         const eligible = facility.properties.proximity_eligible
+        const focused = focusedIds.has(facility.properties.id)
         return (
           <CircleMarker
             key={facility.properties.id}
             center={[lat, lon]}
-            radius={7}
+            radius={focused ? 7 : 5}
             pathOptions={{
               color: eligible ? '#ffffff' : color,
               weight: eligible ? 1.5 : 2.5,
+              opacity: focused ? 1 : 0.5,
               fillColor: color,
-              fillOpacity: eligible ? 0.95 : 0,
+              fillOpacity: eligible ? (focused ? 0.95 : 0.35) : 0,
             }}
           >
             <Popup>

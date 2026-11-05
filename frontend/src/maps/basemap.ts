@@ -9,9 +9,9 @@ export const BASEMAP = {
   maxZoom: 19,
 }
 
-// Between Redlands and Yucaipa; replaced by the city bounds once loaded
-export const INITIAL_CENTER: LatLngExpression = [34.045, -117.11]
-export const INITIAL_ZOOM = 12
+// Centre of the study communities; replaced by their bounds once loaded
+export const INITIAL_CENTER: LatLngExpression = [34.09, -117.17]
+export const INITIAL_ZOOM = 11
 
 export const BOUNDARY_STYLE: PathOptions = {
   color: '#3d3d3d',

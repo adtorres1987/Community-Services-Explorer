@@ -240,6 +240,23 @@ select {
   background: var(--accent-bg);
 }
 
+.stats-table tfoot th,
+.stats-table tfoot td {
+  border-bottom: 0;
+  font-weight: 600;
+}
+
+.tag {
+  margin-left: 6px;
+  padding: 0 4px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  vertical-align: middle;
+}
+
 .stats-detail {
   margin: 10px 0 0;
 }
@@ -287,6 +304,14 @@ select {
 
 .swatch--hollow {
   border: 2.5px solid var(--text-muted);
+}
+
+.swatch--faded {
+  width: 10px;
+  height: 10px;
+  margin: 0 1px;
+  background: var(--text-muted);
+  opacity: 0.35;
 }
 
 .swatch--area {

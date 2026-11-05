@@ -2,11 +2,14 @@
 
 ## Plan de implementación por fases
 
-**Versión:** 1.1\
-**Estado:** MVP completado (fases 0--6). Pendiente: video demostrativo y
-demo pública.\
+**Versión:** 1.2\
+**Estado:** MVP completado (fases 0--6) y ampliado a nueve comunidades
+con cobertura por población. Pendiente: video demostrativo y demo
+pública.\
 **Última actualización:** 2026-11-02\
-**Área de estudio:** Yucaipa y Redlands, California\
+**Área de estudio:** inicialmente Yucaipa y Redlands; ahora Colton, Grand
+Terrace, Highland, Loma Linda, Mentone, Redlands, Rialto, San Bernardino
+y Yucaipa (California)\
 **Dedicación estimada:** 4--5 horas por semana\
 **Objetivo:** construir un proyecto GIS demostrable para un portafolio
 de GIS Developer / Geospatial Software Engineer.
@@ -25,14 +28,29 @@ Diferencias respecto al plan original:
     antiguo para GeoPandas 1.x.
 -   La imagen de PostGIS es `imresamu/postgis:17-3.5` (multiarquitectura),
     porque `postgis/postgis` no tiene versión para arm64.
--   Se añadieron los campos `in_city_limits` y `proximity_eligible`, y el
-    campo genérico `attributes` (JSONB) en `facilities`.
--   La proximidad se presenta como porcentaje del área de cada ciudad a
-    500 m / 1 km de una escuela (`/analysis/proximity`).
+-   Se añadieron los campos `proximity_eligible` y el campo genérico
+    `attributes` (JSONB) en `facilities`.
 -   Se agregaron un script de descarga con verificación de checksum, el
     GeoPackage procesado en el repositorio, Docker Compose completo
     (db, carga, API, frontend con nginx) e integración continua con
     GitHub Actions.
+
+### Ampliación: nueve comunidades del valle de San Bernardino
+
+Se evaluó todo el condado (565 escuelas, 24 ciudades) y se acotó a nueve
+comunidades contiguas: Colton, Grand Terrace, Highland, Loma Linda,
+Mentone (CDP, no incorporada), Redlands, Rialto, San Bernardino y Yucaipa.
+
+-   173 escuelas y 612.335 habitantes (Censo 2020).
+-   Las escuelas se asignan por límite (unión espacial), no por la ciudad
+    de la dirección, que incluye barrios y erratas.
+-   Las escuelas a menos de 2 km del área (32, de cualquier condado)
+    cuentan para la cobertura, sin efecto de borde.
+-   Cobertura por población (bloques del Censo 2020, P.L. 94-171,
+    repartidos por área) además de por superficie.
+-   Radios: 500 m, 1 km, 1,5 km y 2 km.
+-   Migración `002`, tabla `population_units`; GeoPackage de ~3 MB.
+-   Desarrollado en la rama `feature/san-bernardino-county`.
 
 Documentación técnica: `README.md` y `docs/`.
 
@@ -639,9 +657,9 @@ Todas resueltas (detalle en `docs/data-sources.md`):
 3.  Elegir el CRS de análisis. **Resuelto:** EPSG:26911 (NAD83 / UTM
     zona 11N, metros).
 4.  Confirmar la fuente de límites municipales. **Resuelto:** Census
-    TIGER/Line 2026 Places. Se mantiene el filtro por ciudad de la
-    dirección y se marca `in_city_limits` (2 escuelas de Redlands quedan
-    fuera del límite).
+    TIGER/Line 2026 Places. En el MVP se filtró por ciudad de la
+    dirección y se marcó `in_city_limits`; en la ampliación a nueve
+    comunidades la asignación pasó a ser por límite.
 5.  Definir si se incluirán únicamente escuelas públicas o también otras
     instalaciones educativas. **Resuelto:** solo escuelas públicas
     activas (dataset del CDE); las exclusivamente virtuales se excluyen

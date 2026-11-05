@@ -8,8 +8,10 @@ from app.schemas.geojson import Geometry
 class CityProperties(BaseModel):
     name: str
     geoid: str
+    place_type: str  # "city" or "CDP" (unincorporated census-designated place)
     area_km2: float
-    facility_count: int  # facilities whose address city matches
+    population: int  # 2020 census, apportioned from blocks
+    facility_count: int  # facilities inside the boundary
 
 
 class CityFeature(BaseModel):

@@ -3,32 +3,45 @@
 [![CI](https://github.com/adtorres1987/Community-Services-Explorer/actions/workflows/ci.yml/badge.svg)](https://github.com/adtorres1987/Community-Services-Explorer/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-A geospatial web application for exploring public schools in **Redlands and
-Yucaipa, California**, and how much of each city lies within a straight-line
-radius of one. Built end to end, from raw public data to an interactive map:
-Python data pipeline → PostGIS → FastAPI → React + Leaflet.
+A geospatial web application for exploring public schools in nine contiguous
+communities of the **San Bernardino Valley, California** — Colton, Grand
+Terrace, Highland, Loma Linda, Mentone, Redlands, Rialto, San Bernardino and
+Yucaipa — and how many residents, and how much land, lie within a
+straight-line radius of one. Built end to end, from raw public data to an
+interactive map: Python data pipeline → PostGIS → FastAPI → React + Leaflet.
 
-![Both cities with 1 km proximity coverage](docs/images/overview-1km.jpg)
+![Nine communities with 1 km proximity coverage](docs/images/overview-1km.jpg)
 
 ## Features
 
-- Map of 37 active public schools with city boundaries, colour-coded by school type
-- Filters by city and school type; popups with district, grades, enrolment and instruction mode
-- Proximity coverage at 500 m or 1 km, computed in PostGIS and drawn on the map
-- Side-by-side statistics for both cities, with the method and its limits stated in the UI
+- Map of 173 active public schools in nine communities (612,335 residents),
+  colour-coded by school type, plus 32 nearby schools that count toward coverage
+- Schools assigned to communities by boundary, not by mailing address
+- Filters by community and school type; popups with district, grades, enrolment and instruction mode
+- Proximity coverage at 500 m, 1 km, 1.5 km or 2 km, computed in PostGIS and drawn on the map
+- Coverage by **population** (2020 census blocks, apportioned by area) and by area
+- Statistics for every community with a weighted total, and the method and its limits stated in the UI
 - REST API returning GeoJSON, with OpenAPI docs and explicit error handling
 - Reproducible data pipeline with checksummed sources, and tests at every layer
 
-| City | Schools | Area within 500 m | Area within 1 km |
+| Community | Schools | Residents within 1 km | Area within 1 km |
 |---|---|---|---|
-| Redlands (93.86 km²) | 24 (20 eligible) | 12.9 % | 38.8 % |
-| Yucaipa (73.13 km²) | 13 | 11.1 % | 34.7 % |
+| Colton | 15 | 84.8 % | 52.9 % |
+| Grand Terrace | 4 | 90.4 % | 76.0 % |
+| Highland | 10 | 83.5 % | 41.4 % |
+| Loma Linda | 2 | 28.7 % | 25.9 % |
+| Mentone (CDP) | 2 | 68.9 % | 30.1 % |
+| Redlands | 22 | 74.8 % | 39.6 % |
+| Rialto | 28 | 94.9 % | 65.7 % |
+| San Bernardino | 77 | 88.3 % | 58.2 % |
+| Yucaipa | 13 | 59.4 % | 35.3 % |
+| **All nine** | **173** | **81.8 %** | **48.7 %** |
 
-*Straight-line distance over land area, not travel time or population. See
-[analysis limitations](docs/analysis-limitations.md).*
+*Straight-line distance, not travel time; any public school of any type and
+grade level counts. See [analysis limitations](docs/analysis-limitations.md).*
 
 <p>
-  <img src="docs/images/redlands-500m-popup.jpg" alt="Redlands at 500 m with a school popup" width="68%">
+  <img src="docs/images/redlands-500m-popup.jpg" alt="Redlands selected at 500 m with a school popup" width="68%">
   <img src="docs/images/mobile.jpg" alt="Mobile layout" width="24%">
 </p>
 
@@ -77,10 +90,17 @@ npm run dev
 ### Rebuilding the data from the original sources
 
 ```bash
-python scripts/download_data.py    # CDE schools + Census TIGER/Line, checksum-verified
-python scripts/prepare_schools.py  # filter, validate, reproject → data/processed/study_area.gpkg
+python scripts/download_data.py       # CDE schools + Census boundaries and population (~110 MB), checksum-verified
+python scripts/prepare_study_area.py  # assign by boundary, add population → data/processed/study_area.gpkg
 python scripts/load_postgis.py
 ```
+
+The study communities are listed by Census GEOID in `STUDY_PLACES` in
+`scripts/prepare_study_area.py`.
+
+If your database was created before migration `002`, either recreate it
+(`docker compose down -v`) or apply `database/migrations/002_study_places_population.sql`
+with `psql`, then reload (see [docs/database.md](docs/database.md)).
 
 ## Tests
 
@@ -113,7 +133,7 @@ in [docs/architecture.md](docs/architecture.md).
 ```text
 backend/        FastAPI app (api/, schemas/, services/) and API tests
 frontend/       React app (components/, features/, maps/, services/)
-scripts/        download_data.py, prepare_schools.py, load_postgis.py
+scripts/        download_data.py, prepare_study_area.py, load_postgis.py
 database/       migrations/ and documented spatial queries (sql/)
 data/           raw/ (downloaded, not committed) and processed/ (committed)
 tests/          data pipeline tests
@@ -126,6 +146,7 @@ docs/           architecture, data sources, database, API, limitations
 |---|---|---|
 | [California Public Schools 2025–26](https://data.ca.gov/@california-department-of-education/california-public-schools-2025-26) | California Department of Education | No restrictions on public use |
 | [TIGER/Line 2026 Places, California](https://www2.census.gov/geo/tiger/TIGER2026/PLACE/) | U.S. Census Bureau | Public domain |
+| [TIGER/Line 2020 blocks](https://www2.census.gov/geo/tiger/TIGER2020PL/LAYER/TABBLOCK/2020/) and [2020 P.L. 94-171 population](https://www2.census.gov/programs-surveys/decennial/2020/data/01-Redistricting_File--PL_94-171/California/) | U.S. Census Bureau | Public domain |
 | Basemap tiles | © [OpenStreetMap](https://www.openstreetmap.org/copyright) contributors | ODbL; [tile usage policy](https://operations.osmfoundation.org/policies/tiles/) |
 
 Field descriptions, checksums and processing criteria: [docs/data-sources.md](docs/data-sources.md).
@@ -145,7 +166,7 @@ Field descriptions, checksums and processing criteria: [docs/data-sources.md](do
 
 - More community services: parks, libraries, clinics, transit (the `facilities` table is already generic)
 - Network-based accessibility: walking distance and service areas on the street network
-- Population-weighted coverage using census blocks
+- School-age population (ACS) instead of total population
 - OGC services (WMS/WFS, OGC API Features) and an ArcGIS Maps SDK comparison
 
 ## License

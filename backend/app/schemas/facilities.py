@@ -10,8 +10,9 @@ class FacilityProperties(BaseModel):
     name: str
     facility_type: str
     facility_subtype: str | None
-    city: str
-    in_city_limits: bool
+    city: str | None  # study place containing the facility; None outside the study area
+    address_city: str | None  # mailing-address city from the source
+    in_study_area: bool  # False: nearby facility used only for proximity coverage
     proximity_eligible: bool
     attributes: dict[str, Any]
 

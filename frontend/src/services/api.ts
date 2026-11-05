@@ -13,6 +13,7 @@ export interface SchoolAttributes {
   DistrictName: string | null
   Street: string | null
   Zip: string | null
+  CountyNameGeo: string | null
   Website: string | null
   EnrollTotal: number | null
 }
@@ -22,8 +23,12 @@ export interface FacilityProperties {
   name: string
   facility_type: string
   facility_subtype: string | null
-  city: string
-  in_city_limits: boolean
+  /** Study place containing the facility; null outside the study area */
+  city: string | null
+  /** Mailing-address city from the source */
+  address_city: string | null
+  /** False: nearby facility that only contributes to proximity coverage */
+  in_study_area: boolean
   proximity_eligible: boolean
   attributes: SchoolAttributes
 }
@@ -33,7 +38,10 @@ export type FacilityCollection = FeatureCollection<Point, FacilityProperties>
 export interface CityProperties {
   name: string
   geoid: string
+  /** "city" or "CDP" (unincorporated census-designated place) */
+  place_type: string
   area_km2: number
+  population: number
   facility_count: number
 }
 
@@ -41,11 +49,16 @@ export type CityCollection = FeatureCollection<MultiPolygon, CityProperties>
 
 export interface CityProximity {
   city: string
-  city_area_km2: number
   eligible_facilities: number
   excluded_facilities: number
+  /** Eligible facilities anywhere within the radius, including neighbouring places */
+  contributing_facilities: number
+  city_area_km2: number
   covered_area_km2: number
   covered_pct: number
+  population: number
+  covered_population: number
+  covered_population_pct: number
   coverage: Polygon | MultiPolygon | null
 }
 

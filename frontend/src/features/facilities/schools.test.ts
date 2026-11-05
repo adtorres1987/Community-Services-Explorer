@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { makeFacility } from '../../test/fixtures'
-import { gradeRange, matchesFilters, schoolCategory, virtualLabel } from './schools'
+import { gradeRange, isInFocus, matchesSubtype, schoolCategory, virtualLabel } from './schools'
 
 describe('schoolCategory', () => {
   it('keeps the main school types', () => {
@@ -43,16 +43,34 @@ describe('virtualLabel', () => {
   })
 })
 
-describe('matchesFilters', () => {
-  const facility = makeFacility({ city: 'Yucaipa', facility_subtype: 'High' }).properties
+describe('matchesSubtype', () => {
+  const facility = makeFacility({ facility_subtype: 'High' }).properties
 
-  it('matches when filters are empty', () => {
-    expect(matchesFilters(facility, { city: null, subtype: null })).toBe(true)
+  it('matches any type when no subtype is selected', () => {
+    expect(matchesSubtype(facility, null)).toBe(true)
   })
 
-  it('applies city and subtype together', () => {
-    expect(matchesFilters(facility, { city: 'Yucaipa', subtype: 'High' })).toBe(true)
-    expect(matchesFilters(facility, { city: 'Redlands', subtype: 'High' })).toBe(false)
-    expect(matchesFilters(facility, { city: 'Yucaipa', subtype: 'Middle' })).toBe(false)
+  it('matches only the selected subtype', () => {
+    expect(matchesSubtype(facility, 'High')).toBe(true)
+    expect(matchesSubtype(facility, 'Middle')).toBe(false)
+  })
+})
+
+describe('isInFocus', () => {
+  const facility = makeFacility({ city: 'Yucaipa', facility_subtype: 'High' }).properties
+
+  it('focuses study-area schools when no place is selected', () => {
+    expect(isInFocus(facility, { city: null, subtype: null })).toBe(true)
+  })
+
+  it('applies place and subtype together', () => {
+    expect(isInFocus(facility, { city: 'Yucaipa', subtype: 'High' })).toBe(true)
+    expect(isInFocus(facility, { city: 'Redlands', subtype: 'High' })).toBe(false)
+    expect(isInFocus(facility, { city: 'Yucaipa', subtype: 'Middle' })).toBe(false)
+  })
+
+  it('never focuses schools outside the study area', () => {
+    const context = makeFacility({ city: null, in_study_area: false }).properties
+    expect(isInFocus(context, { city: null, subtype: null })).toBe(false)
   })
 })

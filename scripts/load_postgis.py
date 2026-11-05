@@ -17,10 +17,11 @@ GPKG_PATH = ROOT / "data/processed/study_area.gpkg"
 SRID = 26911
 SCHOOLS_SOURCE = "cde_public_schools_2025_26"
 BOUNDARIES_SOURCE = "census_tiger_2026_place"
+POPULATION_SOURCE = "census_2020_pl_blocks"
 
 SCHOOL_ATTRIBUTES = [
     "SchoolLevel", "GradeLow", "GradeHigh", "Charter", "Virtual",
-    "DistrictName", "Street", "Zip", "Website", "EnrollTotal",
+    "DistrictName", "Street", "Zip", "CountyNameGeo", "Website", "EnrollTotal",
 ]
 
 
@@ -33,14 +34,20 @@ def records(gdf):
     return rows
 
 
+def place_type(name_lsad: str) -> str:
+    # NAMELSAD ends with the legal/statistical area description, e.g. "Mentone CDP"
+    return name_lsad.rsplit(" ", 1)[-1]
+
+
 if not GPKG_PATH.exists():
-    raise FileNotFoundError(f"{GPKG_PATH} — run scripts/prepare_schools.py first")
+    raise FileNotFoundError(f"{GPKG_PATH} — run scripts/prepare_study_area.py first")
 
 load_dotenv(ROOT / ".env")
 
 schools = gpd.read_file(GPKG_PATH, layer="schools")
 cities = gpd.read_file(GPKG_PATH, layer="city_boundaries")
-for name, layer in (("schools", schools), ("city_boundaries", cities)):
+units = gpd.read_file(GPKG_PATH, layer="population_units")
+for name, layer in (("schools", schools), ("city_boundaries", cities), ("population_units", units)):
     if layer.crs.to_epsg() != SRID:
         raise ValueError(f"{name} CRS is {layer.crs}, expected EPSG:{SRID}")
 
@@ -53,28 +60,46 @@ conninfo = psycopg.conninfo.make_conninfo(
 )
 
 with psycopg.connect(conninfo) as conn, conn.cursor() as cur:
+    # Population units reference city boundaries, so they are removed first
+    cur.execute("DELETE FROM population_units WHERE source_name = %s", (POPULATION_SOURCE,))
+    cur.execute("DELETE FROM facilities WHERE source_name = %s", (SCHOOLS_SOURCE,))
     cur.execute("DELETE FROM city_boundaries WHERE source_name = %s", (BOUNDARIES_SOURCE,))
+
     cur.executemany(
         """
-        INSERT INTO city_boundaries (geoid, name, source_name, geom)
-        VALUES (%s, %s, %s, ST_Multi(ST_GeomFromWKB(%s, %s)))
+        INSERT INTO city_boundaries (geoid, name, place_type, population, source_name, geom)
+        VALUES (%s, %s, %s, %s, %s, ST_Multi(ST_GeomFromWKB(%s, %s)))
         """,
-        [(r["geoid"], r["city"], BOUNDARIES_SOURCE, r["wkb"], SRID) for r in records(cities)],
+        [
+            (r["geoid"], r["city"], place_type(r["name_lsad"]), r["population"],
+             BOUNDARIES_SOURCE, r["wkb"], SRID)
+            for r in records(cities)
+        ],
     )
 
-    cur.execute("DELETE FROM facilities WHERE source_name = %s", (SCHOOLS_SOURCE,))
+    cur.executemany(
+        """
+        INSERT INTO population_units (geoid20, city, source_name, population, geom)
+        VALUES (%s, %s, %s, %s, ST_Multi(ST_GeomFromWKB(%s, %s)))
+        """,
+        [
+            (r["geoid20"], r["city"], POPULATION_SOURCE, r["population"], r["wkb"], SRID)
+            for r in records(units)
+        ],
+    )
+
     cur.executemany(
         """
         INSERT INTO facilities (
             source_id, source_name, name, facility_type, facility_subtype, city,
-            in_city_limits, proximity_eligible, attributes, geom
+            address_city, in_study_area, proximity_eligible, attributes, geom
         )
-        VALUES (%s, %s, %s, 'school', %s, %s, %s, %s, %s, ST_GeomFromWKB(%s, %s))
+        VALUES (%s, %s, %s, 'school', %s, %s, %s, %s, %s, %s, ST_GeomFromWKB(%s, %s))
         """,
         [
             (
-                r["CDSCode"], SCHOOLS_SOURCE, r["SchoolName"], r["SchoolType"], r["City"],
-                r["in_city_limits"], r["proximity_eligible"],
+                r["CDSCode"], SCHOOLS_SOURCE, r["SchoolName"], r["SchoolType"], r["study_city"],
+                r["City"], r["in_study_area"], r["proximity_eligible"],
                 Jsonb({key: r[key] for key in SCHOOL_ATTRIBUTES}),
                 r["wkb"], SRID,
             )
@@ -82,16 +107,18 @@ with psycopg.connect(conninfo) as conn, conn.cursor() as cur:
         ],
     )
 
-    cur.execute("SELECT count(*) FROM city_boundaries WHERE source_name = %s", (BOUNDARIES_SOURCE,))
-    loaded_cities = cur.fetchone()[0]
-    cur.execute("SELECT count(*) FROM facilities WHERE source_name = %s", (SCHOOLS_SOURCE,))
-    loaded_schools = cur.fetchone()[0]
+    counts = {}
+    for table, source in (
+        ("city_boundaries", BOUNDARIES_SOURCE),
+        ("population_units", POPULATION_SOURCE),
+        ("facilities", SCHOOLS_SOURCE),
+    ):
+        cur.execute(f"SELECT count(*) FROM {table} WHERE source_name = %s", (source,))
+        counts[table] = cur.fetchone()[0]
 
+    expected = {"city_boundaries": len(cities), "population_units": len(units), "facilities": len(schools)}
     # Raising inside the block rolls the transaction back
-    if (loaded_cities, loaded_schools) != (len(cities), len(schools)):
-        raise RuntimeError(
-            f"Row count mismatch: cities {loaded_cities}/{len(cities)}, "
-            f"schools {loaded_schools}/{len(schools)}"
-        )
+    if counts != expected:
+        raise RuntimeError(f"Row count mismatch: loaded {counts}, expected {expected}")
 
-print(f"city_boundaries: {loaded_cities} rows | facilities: {loaded_schools} rows")
+print(" | ".join(f"{table}: {count} rows" for table, count in counts.items()))

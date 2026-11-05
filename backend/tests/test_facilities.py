@@ -1,17 +1,36 @@
+def by_name(features, name):
+    return next(f["properties"] for f in features if f["properties"]["name"] == name)
+
+
 def test_list_all_facilities(client):
     response = client.get("/facilities")
     assert response.status_code == 200
     body = response.json()
     assert body["type"] == "FeatureCollection"
-    assert len(body["features"]) == 37
+    assert len(body["features"]) == 205
+    assert sum(f["properties"]["in_study_area"] for f in body["features"]) == 173
 
 
-def test_coordinates_are_wgs84_in_study_area(client):
+def test_context_facilities_have_no_study_city(client):
+    for feature in client.get("/facilities").json()["features"]:
+        properties = feature["properties"]
+        assert properties["in_study_area"] == (properties["city"] is not None)
+
+
+def test_coordinates_are_wgs84_near_study_area(client):
     features = client.get("/facilities").json()["features"]
     for feature in features:
         lon, lat = feature["geometry"]["coordinates"]
-        assert -117.3 < lon < -116.9
-        assert 33.9 < lat < 34.2
+        assert -117.50 < lon < -116.95
+        assert 33.95 < lat < 34.30
+
+
+def test_city_is_assigned_by_boundary_not_address(client):
+    features = client.get("/facilities").json()["features"]
+    mission = by_name(features, "Mission Elementary")
+    assert (mission["city"], mission["address_city"]) == ("Loma Linda", "Redlands")
+    rev = by_name(features, "Redlands East Valley High")
+    assert (rev["city"], rev["address_city"]) == ("Mentone", "Redlands")
 
 
 def test_filter_by_city(client):
@@ -24,7 +43,7 @@ def test_filter_by_subtype(client):
     features = client.get(
         "/facilities", params={"city": "Redlands", "facility_subtype": "High"}
     ).json()["features"]
-    assert len(features) == 4
+    assert len(features) == 3
     assert {f["properties"]["facility_subtype"] for f in features} == {"High"}
 
 

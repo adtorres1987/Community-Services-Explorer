@@ -23,16 +23,41 @@ All geometries are GeoJSON in **EPSG:4326**. Distances are computed in EPSG:2691
 | Method | Endpoint | Parameters | Returns |
 |---|---|---|---|
 | GET | `/health` | — | API, database and PostGIS version; 503 if the database is unreachable |
-| GET | `/facilities` | `city`, `facility_type`, `facility_subtype` (all optional) | FeatureCollection of facilities |
+| GET | `/facilities` | `city`, `facility_type`, `facility_subtype` (all optional) | FeatureCollection of facilities, including context facilities |
 | GET | `/facilities/{id}` | `id` ≥ 1 | Feature |
-| GET | `/cities` | — | FeatureCollection of city boundaries with area and facility count |
-| GET | `/analysis/proximity` | `radius_m` (100–2000, required), `city`, `facility_type`, `facility_subtype` | Coverage per city |
+| GET | `/cities` | — | FeatureCollection of the nine study places with type, area, 2020 population and facility count |
+| GET | `/analysis/proximity` | `radius_m` (100–2000, required), `city`, `facility_type`, `facility_subtype` | Coverage per place, by area and population |
+
+The API keeps the name `city` for a study place; Mentone is a CDP, not a city.
+
+### `/facilities`
+
+`city` is the study place whose boundary contains the facility, and the `city`
+filter uses it. `address_city` is the mailing address from the source and can
+differ. Context facilities (`in_study_area: false`, `city: null`) are within
+2 km of the study area and only contribute to coverage.
+
+```json
+{
+  "id": 291,
+  "name": "Redlands East Valley High",
+  "facility_type": "school",
+  "facility_subtype": "High",
+  "city": "Mentone",
+  "address_city": "Redlands",
+  "in_study_area": true,
+  "proximity_eligible": true,
+  "attributes": { "GradeLow": "09", "GradeHigh": "12", "DistrictName": "Redlands Unified", "...": "..." }
+}
+```
 
 ### `/analysis/proximity`
 
-For each city, the share of the city area within `radius_m` of a
-proximity-eligible facility whose address city is that city. The buffers are
-clipped to the city boundary and returned as `coverage` geometry.
+For each place: the part of its area within `radius_m` of **any**
+proximity-eligible facility (including facilities in neighbouring places and
+context facilities), clipped to the boundary and returned as `coverage`
+geometry; and the share of its 2020 residents in that area, apportioning each
+census block's population by the share of its area covered.
 
 ```json
 {
@@ -43,20 +68,28 @@ clipped to the city boundary and returned as `coverage` geometry.
   "results": [
     {
       "city": "Yucaipa",
-      "city_area_km2": 73.13,
       "eligible_facilities": 13,
       "excluded_facilities": 0,
-      "covered_area_km2": 25.36,
-      "covered_pct": 34.7,
+      "contributing_facilities": 15,
+      "city_area_km2": 73.13,
+      "covered_area_km2": 25.82,
+      "covered_pct": 35.3,
+      "population": 54541,
+      "covered_population": 32395,
+      "covered_population_pct": 59.4,
       "coverage": { "type": "MultiPolygon", "coordinates": [] }
     }
   ]
 }
 ```
 
-`excluded_facilities` counts records that are not proximity eligible
-(exclusively virtual schools). A `facility_type` with no facilities returns
-`eligible_facilities: 0`, `covered_pct: 0` and `coverage: null`.
+- `eligible_facilities`: eligible facilities inside the place.
+- `excluded_facilities`: facilities inside the place that are not eligible
+  (exclusively virtual schools).
+- `contributing_facilities`: eligible facilities anywhere within `radius_m`
+  of the place (here 13 in Yucaipa plus 2 nearby).
+- A `facility_type` with no facilities returns zeros and `coverage: null`.
+- All nine places take 0.6–0.8 s; pass `city` for a single place.
 
 ## Errors
 
@@ -74,5 +107,6 @@ Integration tests run against the loaded PostGIS container:
 python -m pytest backend/tests
 ```
 
-They check record counts, WGS84 coordinates, filters, error codes, and that
-coverage percentages match the values verified independently with GeoPandas.
+They check record counts, boundary-based assignment, WGS84 coordinates,
+filters, error codes, and that area and population coverage match the values
+verified independently with GeoPandas.

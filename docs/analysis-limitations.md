@@ -1,51 +1,66 @@
 # Analysis limitations
 
-The proximity analysis answers one narrow question: *what share of each city's
-area lies within a straight-line radius of a public school?* It is easy to read
-more into the result than it supports. These are the known limitations.
+The proximity analysis answers a narrow question: *what share of each
+community's residents, and of its area, lies within a straight-line radius of
+a public school?* It is easy to read more into the result than it supports.
+These are the known limitations.
 
 ## What the radius does not measure
 
-- **Straight-line distance, not travel.** A 1 km radius can cross freeways,
-  rail lines, washes and hills that make the real walk much longer. Measuring
-  access would need a street network and travel times (roadmap Phase 8).
-- **Area, not people.** Coverage is a share of land area. Parts of both cities
-  are hills, parks or industrial land where no students live, so the
-  percentage of *residents* near a school can differ substantially.
-  Population-weighted coverage (e.g. with census blocks) would be the next step.
+- **Straight-line distance, not travel.** A 1 km radius can cross freeways
+  (I-10, I-215), rail lines, the Santa Ana River and washes that make the real
+  walk much longer. Measuring access would need a street network and travel
+  times (roadmap Phase 8).
 - **Proximity is not access.** The analysis ignores enrolment boundaries,
   school choice, capacity, grade levels served, transport and quality.
   A school nearby may not be one a given student can attend.
+- **All residents, not school-age children.** Population is the 2020 total
+  (`POP100`), not children of school age.
+
+## Population estimate
+
+- **Area apportionment.** Residents are 2020 census block counts. When a
+  coverage area (or a 2026 boundary) cuts a block, the block's population is
+  split in proportion to area, assuming people are spread evenly within it.
+  Small urban blocks make this accurate in built-up areas; large blocks on the
+  urban edge (foothills, washes) can be off.
+- **Different years.** Population is from 2020, boundaries from 2026 and
+  schools from 2025–26. Growth and annexations since 2020 are not reflected.
+- **Simplified blocks.** Block geometry is simplified with a 1 m tolerance
+  after the population is computed (total area changes by ~0.003 %).
+- **Area vs. people.** Both are reported because they diverge: in Redlands,
+  40 % of the land but 75 % of residents are within 1 km of a school; the
+  remaining land is largely hills and open space.
 
 ## Data choices that affect the numbers
 
-- **Schools are selected by address city.** The CDE `City` field is a mailing
-  address. Two schools with a Redlands address lie outside the Redlands city
-  limits (Mission Elementary, 89 m; Redlands East Valley High, 772 m). They are
-  kept and flagged with `in_city_limits = false`; their coverage is clipped to
-  the city boundary.
-- **Edge effect.** Only schools with a Redlands or Yucaipa address are loaded.
-  Schools just across the boundary (Highland, Mentone, Loma Linda, Calimesa)
-  are ignored, so coverage near the city edges is underestimated.
-- **Exclusively virtual schools are excluded** from the proximity analysis
-  (`Virtual = 'V'`, 4 records in Redlands). Their location is an administrative
-  office; three of them share the same point.
-- **Co-located schools.** Some records share a site (the two Gorman Learning
-  Center records are 1 m apart; Green Valley High and Green Valley Independent
-  Study are 4 m apart). Counts are of records, not physical sites.
+- **Assignment by boundary.** A school belongs to the place whose boundary
+  contains it, not to its mailing-address city. 15 schools have an address
+  city different from their place (e.g. Mission Elementary, "Redlands", is in
+  Loma Linda).
+- **Neighbouring schools count.** Coverage uses every eligible school within
+  the radius, including schools in other study places and 32 context schools
+  up to 2 km outside the study area (Fontana, Bloomington, unincorporated San
+  Bernardino, Riverside County, Calimesa). Schools farther away cannot reach
+  inside within the 2 km maximum radius, so there is no edge effect.
+- **Exclusively virtual schools are excluded** from coverage (`Virtual = 'V'`,
+  7 records). Their location is an administrative office; three share one point.
+- **Co-located schools.** Some records share a site (0–4 m apart). School
+  counts are of records, not physical sites.
+- **Mentone is a CDP**, a statistical area defined by the Census Bureau, not a
+  city with legal limits.
 - **Public schools only.** Private schools, preschools and colleges are not in
   the CDE dataset.
 
 ## Source and method details
 
-- **Snapshot in time.** Schools: CDE California Public Schools 2025–26,
-  downloaded 2026-11-02. Boundaries: Census TIGER/Line 2026. Both are
-  updated periodically; `scripts/download_data.py` detects changes by checksum.
+- **Snapshot in time.** All sources were downloaded on 2026-11-02;
+  `scripts/download_data.py` detects later changes by checksum.
 - **TIGER/Line boundaries are cartographic,** intended for statistical use,
   not legal boundary determination.
 - **Projection.** Distances and areas are computed in EPSG:26911
   (NAD83 / UTM zone 11N). At this scale projected and geodesic distances agree
   to the metre (verified in `database/sql/spatial_queries.sql`).
 - **Buffer approximation.** PostGIS approximates circles with 32-segment
-  polygons, which gives results within 0.1 percentage points of a finer
-  GeoPandas calculation.
+  polygons; an independent GeoPandas calculation with the same resolution
+  gives identical results.

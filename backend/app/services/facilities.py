@@ -4,8 +4,8 @@ from app.schemas.facilities import FacilityCollection, FacilityFeature, Facility
 
 FACILITY_SELECT = """
 SELECT
-    id, name, facility_type, facility_subtype, city,
-    in_city_limits, proximity_eligible, attributes,
+    id, name, facility_type, facility_subtype, city, address_city,
+    in_study_area, proximity_eligible, attributes,
     ST_AsGeoJSON(ST_Transform(geom, 4326), 6)::json AS geometry
 FROM facilities
 """
@@ -28,7 +28,7 @@ def list_facilities(
         WHERE (%(city)s::text IS NULL OR city = %(city)s)
           AND (%(facility_type)s::text IS NULL OR facility_type = %(facility_type)s)
           AND (%(facility_subtype)s::text IS NULL OR facility_subtype = %(facility_subtype)s)
-        ORDER BY city, name
+        ORDER BY city NULLS LAST, name
         """,
         {"city": city, "facility_type": facility_type, "facility_subtype": facility_subtype},
     ).fetchall()

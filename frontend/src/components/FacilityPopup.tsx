@@ -8,7 +8,9 @@ interface Props {
 export function FacilityPopup({ facility }: Props) {
   const { attributes } = facility
   const grades = gradeRange(facility)
-  const address = [attributes.Street, facility.city, attributes.Zip].filter(Boolean).join(', ')
+  const address = [attributes.Street, facility.address_city, attributes.Zip]
+    .filter(Boolean)
+    .join(', ')
   const website =
     attributes.Website && /^https?:\/\//i.test(attributes.Website) ? attributes.Website : null
 
@@ -20,6 +22,8 @@ export function FacilityPopup({ facility }: Props) {
         {grades && ` · Grades ${grades}`}
       </p>
       <dl>
+        <dt>Located in</dt>
+        <dd>{facility.city ?? 'Outside the study area'}</dd>
         <dt>District</dt>
         <dd>{attributes.DistrictName ?? '—'}</dd>
         <dt>Address</dt>
@@ -31,16 +35,22 @@ export function FacilityPopup({ facility }: Props) {
         <dt>Instruction</dt>
         <dd>{virtualLabel(attributes.Virtual)}</dd>
       </dl>
+      {!facility.in_study_area && (
+        <p className="facility-popup__note">
+          Outside the study communities. Shown because it is close enough to count toward
+          their proximity coverage; not included in school counts.
+        </p>
+      )}
+      {facility.in_study_area && facility.address_city !== facility.city && (
+        <p className="facility-popup__note">
+          The mailing address says {facility.address_city}, but the school is inside the{' '}
+          {facility.city} boundary.
+        </p>
+      )}
       {!facility.proximity_eligible && (
         <p className="facility-popup__note">
           Exclusively virtual: this is an administrative address, so the school is excluded from
           the proximity analysis.
-        </p>
-      )}
-      {!facility.in_city_limits && (
-        <p className="facility-popup__note">
-          The address says {facility.city}, but the location is outside the {facility.city} city
-          limits.
         </p>
       )}
       {website && (

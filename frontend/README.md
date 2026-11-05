@@ -40,10 +40,16 @@ Tests sit next to the code they cover (`*.test.ts`, `*.test.tsx`).
 
 ## Notes
 
-- Facilities are loaded once and filtered in the browser (37 records). The
+- Facilities are loaded once (~200 records) and filtered in the browser. The
   proximity analysis is requested from the API for each radius / school type.
+- Selecting a community highlights its schools; schools in other communities
+  and context schools stay on the map, faded, because they still count toward
+  coverage. Schools of other types are hidden, since coverage uses only the
+  selected type.
 - Basemap: OpenStreetMap standard tiles, desaturated in CSS. They are for light
   use under the [OSM tile usage policy](https://operations.osmfoundation.org/policies/tiles/);
   a public deployment with real traffic should use a tile provider with a key.
 - Marker colours use the Okabe–Ito palette. Exclusively virtual schools are
   drawn hollow because they are excluded from the proximity analysis.
+- The map uses fractional zoom (`zoomSnap` 0.25) so the study area fills
+  narrow mobile screens.

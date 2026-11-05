@@ -49,9 +49,19 @@ export interface FacilityFilters {
   subtype: string | null
 }
 
-export function matchesFilters(properties: FacilityProperties, filters: FacilityFilters): boolean {
+/** Schools of other types are hidden: the coverage only uses the selected type. */
+export function matchesSubtype(properties: FacilityProperties, subtype: string | null): boolean {
+  return subtype === null || properties.facility_subtype === subtype
+}
+
+/**
+ * Schools drawn at full strength: in the study area and in the selected place.
+ * The rest stay on the map, faded, because they still add to the coverage.
+ */
+export function isInFocus(properties: FacilityProperties, filters: FacilityFilters): boolean {
   return (
+    properties.in_study_area &&
     (filters.city === null || properties.city === filters.city) &&
-    (filters.subtype === null || properties.facility_subtype === filters.subtype)
+    matchesSubtype(properties, filters.subtype)
   )
 }

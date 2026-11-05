@@ -28,6 +28,20 @@ SOURCES = [
         "path": RAW_DIR / "tl_2026_06_place/tl_2026_06_place.zip",
         "sha256": "4f1475be8db892b1d4894011846c5c857fe445bf876e470003170cd333d68032",
     },
+    {
+        "name": "Census TIGER/Line 2020 blocks, San Bernardino County (shapefile)",
+        "url": "https://www2.census.gov/geo/tiger/TIGER2020PL/LAYER/TABBLOCK/2020/tl_2020_06071_tabblock20.zip",
+        "path": RAW_DIR / "tl_2020_06071_tabblock20/tl_2020_06071_tabblock20.zip",
+        "sha256": "46bdeb50e3d035b3268d908b0107b48123531375c9f422d6eca74b804af809f7",
+    },
+    {
+        "name": "Census 2020 P.L. 94-171 redistricting data, California",
+        "url": "https://www2.census.gov/programs-surveys/decennial/2020/data/01-Redistricting_File--PL_94-171/California/ca2020.pl.zip",
+        "path": RAW_DIR / "ca2020.pl/ca2020.pl.zip",
+        "sha256": "e02c83c85a9a5d69ded4bf0d4c8ebe3f4bcd2d8e5911db765e9e42915ad1f753",
+        # Only the geographic header is needed: it carries POP100 for every block
+        "extract": ["cageo2020.pl"],
+    },
 ]
 
 
@@ -75,7 +89,7 @@ def main() -> None:
 
         if path.suffix == ".zip":
             with zipfile.ZipFile(path) as archive:
-                archive.extractall(path.parent)
+                archive.extractall(path.parent, members=source.get("extract"))
 
     if mismatches and not args.accept_changed:
         raise SystemExit(

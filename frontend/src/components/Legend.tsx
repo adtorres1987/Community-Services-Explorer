@@ -17,6 +17,10 @@ export function Legend() {
           Exclusively virtual (not in proximity analysis)
         </li>
         <li>
+          <span className="swatch swatch--dot swatch--faded" />
+          Other community or outside the study area (still counts toward coverage)
+        </li>
+        <li>
           <span
             className="swatch swatch--area"
             style={{ background: COVERAGE_STYLE.fillColor, opacity: 0.45 }}
@@ -25,7 +29,7 @@ export function Legend() {
         </li>
         <li>
           <span className="swatch swatch--line" style={{ borderColor: BOUNDARY_STYLE.color }} />
-          City limits (TIGER/Line 2026)
+          Community boundaries (TIGER/Line 2026)
         </li>
       </ul>
     </section>

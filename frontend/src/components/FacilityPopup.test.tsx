@@ -9,6 +9,7 @@ describe('FacilityPopup', () => {
     expect(screen.getByRole('heading', { name: 'Test Elementary' })).toBeInTheDocument()
     expect(screen.getByText('Elementary · Grades KG–5')).toBeInTheDocument()
     expect(screen.getByText('1 Main St., Redlands, 92373')).toBeInTheDocument()
+    expect(screen.getByText('Located in').nextSibling).toHaveTextContent('Redlands')
     expect(screen.getByText('512')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'School website' })).toHaveAttribute(
       'href',
@@ -24,9 +25,20 @@ describe('FacilityPopup', () => {
     expect(screen.getByText(/excluded from the proximity analysis/)).toBeInTheDocument()
   })
 
-  it('notes a school outside its city limits', () => {
-    render(<FacilityPopup facility={makeFacility({ in_city_limits: false }).properties} />)
-    expect(screen.getByText(/outside the Redlands city limits/)).toBeInTheDocument()
+  it('notes when the mailing address names another city', () => {
+    const facility = makeFacility({ city: 'Loma Linda', address_city: 'Redlands' })
+    render(<FacilityPopup facility={facility.properties} />)
+    expect(
+      screen.getByText(/mailing address says Redlands, but the school is inside the Loma Linda boundary/),
+    ).toBeInTheDocument()
+  })
+
+  it('explains schools outside the study area', () => {
+    const facility = makeFacility({ city: null, address_city: 'Colton', in_study_area: false })
+    render(<FacilityPopup facility={facility.properties} />)
+    expect(screen.getByText('Outside the study area')).toBeInTheDocument()
+    expect(screen.getByText(/count toward their proximity coverage/)).toBeInTheDocument()
+    expect(screen.queryByText(/mailing address says/)).not.toBeInTheDocument()
   })
 
   it('does not link websites without an http(s) scheme', () => {

@@ -3,7 +3,7 @@ import { FilterPanel } from './components/FilterPanel'
 import { Legend } from './components/Legend'
 import { MapView } from './components/MapView'
 import { StatisticsPanel } from './components/StatisticsPanel'
-import { matchesFilters } from './features/facilities/schools'
+import { isInFocus, matchesSubtype } from './features/facilities/schools'
 import { fetchCities, fetchFacilities, fetchProximity } from './services/api'
 import { useRequest } from './services/useRequest'
 
@@ -20,10 +20,7 @@ export default function App() {
   )
 
   const allFacilities = useMemo(() => facilities.data?.features ?? [], [facilities.data])
-  const cityNames = useMemo(
-    () => cities.data?.features.map((f) => f.properties.name) ?? [],
-    [cities.data],
-  )
+  const places = useMemo(() => cities.data?.features.map((f) => f.properties) ?? [], [cities.data])
   const subtypes = useMemo(
     () =>
       [...new Set(allFacilities.map((f) => f.properties.facility_subtype))]
@@ -31,15 +28,20 @@ export default function App() {
         .sort(),
     [allFacilities],
   )
-  // Statistics compare both cities, so they only apply the type filter
-  const ofSubtype = useMemo(
-    () => allFacilities.filter((f) => matchesFilters(f.properties, { city: null, subtype })),
+  // Every school of the selected type stays on the map: neighbours add to the coverage
+  const visible = useMemo(
+    () => allFacilities.filter((f) => matchesSubtype(f.properties, subtype)),
     [allFacilities, subtype],
   )
-  const visible = useMemo(
-    () => ofSubtype.filter((f) => matchesFilters(f.properties, { city, subtype })),
-    [ofSubtype, city, subtype],
+  const focusedIds = useMemo(
+    () =>
+      new Set(
+        visible.filter((f) => isInFocus(f.properties, { city, subtype })).map((f) => f.properties.id),
+      ),
+    [visible, city, subtype],
   )
+  // Statistics compare all places, so they only apply the type filter
+  const studySchools = useMemo(() => visible.filter((f) => f.properties.in_study_area), [visible])
   const coverage = (proximity.data?.results ?? []).filter(
     (r) => city === null || r.city === city,
   )
@@ -51,7 +53,7 @@ export default function App() {
     <div className="app">
       <header className="app-header">
         <h1>Community Services Explorer</h1>
-        <p>Public schools in Redlands and Yucaipa, California</p>
+        <p>Public schools in nine San Bernardino Valley communities, California</p>
       </header>
 
       <main className="layout">
@@ -59,6 +61,7 @@ export default function App() {
           <MapView
             cities={cities.data}
             facilities={visible}
+            focusedIds={focusedIds}
             coverage={coverage}
             selectedCity={city}
           />
@@ -79,14 +82,15 @@ export default function App() {
           )}
           {!loading && !loadError && (
             <div className="map-count" aria-live="polite">
-              {visible.length} school{visible.length === 1 ? '' : 's'} shown
+              {focusedIds.size} school{focusedIds.size === 1 ? '' : 's'} in{' '}
+              {city ?? 'the study area'}
             </div>
           )}
         </div>
 
         <aside className="sidebar">
           <FilterPanel
-            cities={cityNames}
+            cities={places.map((p) => p.name)}
             subtypes={subtypes}
             city={city}
             subtype={subtype}
@@ -96,17 +100,18 @@ export default function App() {
             onRadiusChange={setRadius}
           />
           <StatisticsPanel
-            cityNames={cityNames}
+            places={places}
             selectedCity={city}
             subtype={subtype}
-            facilities={ofSubtype}
+            facilities={studySchools}
             radius={radius}
             proximity={proximity}
           />
           <Legend />
           <footer className="sources">
             Data: California Department of Education, California Public Schools 2025–26;
-            U.S. Census Bureau, TIGER/Line 2026 Places.
+            U.S. Census Bureau, TIGER/Line 2026 Places, 2020 Census blocks and P.L. 94-171
+            population.
           </footer>
         </aside>
       </main>
