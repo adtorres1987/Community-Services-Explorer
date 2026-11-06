@@ -34,6 +34,8 @@ per_city AS (
               AND (%(facility_subtype)s::text IS NULL OR f.facility_subtype = %(facility_subtype)s)
         ) AS excluded_facilities,
         count(e.id) AS contributing_facilities,
+        coalesce(array_agg(e.id ORDER BY e.id) FILTER (WHERE e.id IS NOT NULL), '{}')
+            AS contributing_facility_ids,
         ST_Union(ST_Buffer(e.geom, %(radius_m)s::float8)) AS buffers
     FROM city_boundaries b
     -- Any eligible facility within the radius covers part of the place, wherever it is
@@ -59,6 +61,7 @@ SELECT
     c.eligible_facilities,
     c.excluded_facilities,
     c.contributing_facilities,
+    c.contributing_facility_ids,
     c.population,
     coalesce(p.covered_population, 0) AS covered_population,
     ST_Area(c.boundary) / 1e6 AS city_area_km2,
@@ -96,6 +99,7 @@ def proximity(
             eligible_facilities=row["eligible_facilities"],
             excluded_facilities=row["excluded_facilities"],
             contributing_facilities=row["contributing_facilities"],
+            contributing_facility_ids=row["contributing_facility_ids"],
             city_area_km2=round(row["city_area_km2"], 2),
             covered_area_km2=round(row["covered_area_km2"], 2),
             covered_pct=percent(row["covered_area_km2"], row["city_area_km2"]),

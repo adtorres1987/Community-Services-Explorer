@@ -3,12 +3,13 @@ import { FilterPanel } from './components/FilterPanel'
 import { Legend } from './components/Legend'
 import { MapView } from './components/MapView'
 import { StatisticsPanel } from './components/StatisticsPanel'
-import { isInFocus, matchesSubtype } from './features/facilities/schools'
+import { isInFocus, isSelected, matchesSubtype } from './features/facilities/schools'
 import { fetchCities, fetchFacilities, fetchProximity } from './services/api'
 import { useRequest } from './services/useRequest'
 
 export default function App() {
-  const [city, setCity] = useState<string | null>(null)
+  // Selected communities; empty means all
+  const [selectedCities, setSelectedCities] = useState<string[]>([])
   const [subtype, setSubtype] = useState<string | null>(null)
   const [radius, setRadius] = useState<number | null>(null)
 
@@ -36,15 +37,21 @@ export default function App() {
   const focusedIds = useMemo(
     () =>
       new Set(
-        visible.filter((f) => isInFocus(f.properties, { city, subtype })).map((f) => f.properties.id),
+        visible
+          .filter((f) => isInFocus(f.properties, { cities: selectedCities, subtype }))
+          .map((f) => f.properties.id),
       ),
-    [visible, city, subtype],
+    [visible, selectedCities, subtype],
   )
-  // Statistics compare all places, so they only apply the type filter
+  // The statistics panel applies the community selection itself
   const studySchools = useMemo(() => visible.filter((f) => f.properties.in_study_area), [visible])
-  const coverage = (proximity.data?.results ?? []).filter(
-    (r) => city === null || r.city === city,
-  )
+  const coverage = (proximity.data?.results ?? []).filter((r) => isSelected(r.city, selectedCities))
+  const scope =
+    selectedCities.length === 0 || selectedCities.length === places.length
+      ? 'the study area'
+      : selectedCities.length === 1
+        ? selectedCities[0]
+        : `${selectedCities.length} communities`
 
   const loading = cities.loading || facilities.loading
   const loadError = cities.error ?? facilities.error
@@ -63,7 +70,7 @@ export default function App() {
             facilities={visible}
             focusedIds={focusedIds}
             coverage={coverage}
-            selectedCity={city}
+            selectedCities={selectedCities}
           />
           {loading && <div className="map-status">Loading map data…</div>}
           {loadError && (
@@ -82,26 +89,25 @@ export default function App() {
           )}
           {!loading && !loadError && (
             <div className="map-count" aria-live="polite">
-              {focusedIds.size} school{focusedIds.size === 1 ? '' : 's'} in{' '}
-              {city ?? 'the study area'}
+              {focusedIds.size} school{focusedIds.size === 1 ? '' : 's'} in {scope}
             </div>
           )}
         </div>
 
         <aside className="sidebar">
           <FilterPanel
-            cities={places.map((p) => p.name)}
+            places={places}
             subtypes={subtypes}
-            city={city}
+            cities={selectedCities}
             subtype={subtype}
             radius={radius}
-            onCityChange={setCity}
+            onCitiesChange={setSelectedCities}
             onSubtypeChange={setSubtype}
             onRadiusChange={setRadius}
           />
           <StatisticsPanel
             places={places}
-            selectedCity={city}
+            selectedCities={selectedCities}
             subtype={subtype}
             facilities={studySchools}
             radius={radius}

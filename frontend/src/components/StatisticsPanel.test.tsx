@@ -1,12 +1,13 @@
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
-import type { CityProximity, ProximityResponse } from '../services/api'
+import type { ProximityResponse } from '../services/api'
 import type { RequestState } from '../services/useRequest'
-import { makeFacility, makePlace } from '../test/fixtures'
+import { makeFacility, makePlace, makeResult } from '../test/fixtures'
 import { StatisticsPanel } from './StatisticsPanel'
 
 const places = [
+  makePlace('Loma Linda', { population: 24939 }),
   makePlace('Mentone', { place_type: 'CDP', population: 9557 }),
   makePlace('Redlands', { population: 73161 }),
 ]
@@ -15,27 +16,11 @@ const facilities = [
   makeFacility({ id: 1, city: 'Redlands' }),
   makeFacility({ id: 2, city: 'Redlands' }),
   makeFacility({ id: 3, city: 'Mentone' }),
+  makeFacility({ id: 4, city: 'Loma Linda' }),
 ]
 
 function idle(overrides: Partial<RequestState<ProximityResponse>> = {}) {
   return { data: undefined, error: undefined, loading: false, retry: vi.fn(), ...overrides }
-}
-
-function result(overrides: Partial<CityProximity>): CityProximity {
-  return {
-    city: 'Redlands',
-    eligible_facilities: 18,
-    excluded_facilities: 4,
-    contributing_facilities: 22,
-    city_area_km2: 93.86,
-    covered_area_km2: 37.17,
-    covered_pct: 39.6,
-    population: 73161,
-    covered_population: 54741,
-    covered_population_pct: 74.8,
-    coverage: null,
-    ...overrides,
-  }
 }
 
 const proximity: ProximityResponse = {
@@ -44,11 +29,23 @@ const proximity: ProximityResponse = {
   facility_subtype: null,
   method: 'Straight-line',
   results: [
-    result({
-      city: 'Mentone',
-      eligible_facilities: 2,
+    makeResult({
+      city: 'Loma Linda',
+      eligible_facilities: 1,
       excluded_facilities: 0,
-      contributing_facilities: 4,
+      contributing_facility_ids: [4, 7, 8],
+      city_area_km2: 23.2,
+      covered_area_km2: 6.01,
+      covered_pct: 25.9,
+      population: 24939,
+      covered_population: 7160,
+      covered_population_pct: 28.7,
+    }),
+    makeResult({
+      city: 'Mentone',
+      eligible_facilities: 1,
+      excluded_facilities: 0,
+      contributing_facility_ids: [3, 9],
       city_area_km2: 15.85,
       covered_area_km2: 4.77,
       covered_pct: 30.1,
@@ -56,76 +53,92 @@ const proximity: ProximityResponse = {
       covered_population: 6589,
       covered_population_pct: 68.9,
     }),
-    result({}),
+    makeResult({
+      city: 'Redlands',
+      eligible_facilities: 2,
+      excluded_facilities: 4,
+      // School 8 is in Loma Linda and also covers Redlands
+      contributing_facility_ids: [1, 2, 8, 9],
+      city_area_km2: 93.86,
+      covered_area_km2: 37.17,
+      covered_pct: 39.6,
+      population: 73161,
+      covered_population: 54741,
+      covered_population_pct: 74.8,
+    }),
   ],
 }
 
-function row(name: string | RegExp) {
-  return within(screen.getByRole('row', { name }))
+function renderPanel(selectedCities: string[], radius: number | null, state = idle({ data: proximity })) {
+  render(
+    <StatisticsPanel
+      places={places}
+      selectedCities={selectedCities}
+      subtype={null}
+      facilities={facilities}
+      radius={radius}
+      proximity={state}
+    />,
+  )
+  return state
 }
 
-function cells(name: string | RegExp) {
-  return row(name)
+function rowNames() {
+  return screen.getAllByRole('row').slice(1).map((r) => within(r).getByRole('rowheader').textContent)
+}
+
+function detail() {
+  return screen.getByText((_, element) => element?.classList.contains('stats-detail') ?? false)
+    .textContent
+}
+
+function cells(name: RegExp) {
+  return within(screen.getByRole('row', { name }))
     .getAllByRole('cell')
     .map((c) => c.textContent)
 }
 
 describe('StatisticsPanel', () => {
-  it('shows schools and population per place, with a total', () => {
-    render(
-      <StatisticsPanel
-        places={places}
-        selectedCity={null}
-        subtype={null}
-        facilities={facilities}
-        radius={null}
-        proximity={idle()}
-      />,
-    )
+  it('shows every place and an "All" total when nothing is selected', () => {
+    renderPanel([], null)
+    expect(rowNames()).toEqual(['Loma Linda', 'MentoneCDP', 'Redlands', 'All (3)'])
     expect(cells(/^Redlands/)).toEqual(['2', '73,161'])
-    expect(cells(/^Mentone/)).toEqual(['1', '9,557'])
-    expect(cells(/^All /)).toEqual(['3', '82,718'])
-    expect(row(/^Mentone/).getByText('CDP')).toBeInTheDocument()
+    expect(cells(/^All \(3\)/)).toEqual(['4', '107,657'])
     expect(screen.queryByText(/Residents within/)).not.toBeInTheDocument()
-    expect(screen.getByText(/straight-line distance/)).toBeInTheDocument()
   })
 
-  it('shows population and area coverage for the radius', () => {
-    render(
-      <StatisticsPanel
-        places={places}
-        selectedCity="Redlands"
-        subtype={null}
-        facilities={facilities}
-        radius={1000}
-        proximity={idle({ data: proximity })}
-      />,
-    )
-    expect(screen.getByRole('columnheader', { name: 'Residents within 1 km' })).toBeInTheDocument()
-    expect(screen.getByRole('columnheader', { name: 'Area within 1 km' })).toBeInTheDocument()
+  it('shows only the selected places and a weighted total for them', () => {
+    renderPanel(['Mentone', 'Redlands'], 1000)
+    expect(rowNames()).toEqual(['MentoneCDP', 'Redlands', 'Selected (2)'])
     expect(cells(/^Redlands/)).toEqual(['2', '74.8%', '39.6%'])
-    expect(cells(/^Mentone/)).toEqual(['1', '68.9%', '30.1%'])
-    // Totals are weighted by population and area, not averaged
-    // (54,741 + 6,589) / (73,161 + 9,557) and (37.17 + 4.77) / (93.86 + 15.85)
-    expect(cells(/^All /)).toEqual(['3', '74.1%', '38.2%'])
-    expect(
-      screen.getByText(/54,741 of 73,161 residents and 37.17 of 93.86 km² are within 1 km/),
-    ).toBeInTheDocument()
-    expect(screen.getByText(/including 4 outside Redlands; 4 exclusively virtual excluded/)).toBeInTheDocument()
+    // (6,589 + 54,741) / (9,557 + 73,161) and (4.77 + 37.17) / (15.85 + 93.86)
+    expect(cells(/^Selected \(2\)/)).toEqual(['3', '74.1%', '38.2%'])
+  })
+
+  it('summarizes the selection in one sentence with distinct contributing schools', () => {
+    renderPanel(['Mentone', 'Redlands'], 1000)
+    // Contributing ids {3, 9} ∪ {1, 2, 8, 9} = 5 schools; 3 are inside the selection
+    expect(detail()).toBe(
+      '2 selected communities: 61,330 of 82,718 residents (74.1%) and 41.94 of 109.71 km² are ' +
+        'within 1 km of a school. 5 schools contribute, including 2 outside the selection; ' +
+        '4 exclusively virtual excluded.',
+    )
+  })
+
+  it('names a single selected place and omits the total row', () => {
+    renderPanel(['Loma Linda'], 1000)
+    expect(rowNames()).toEqual(['Loma Linda'])
+    expect(detail()).toMatch(/^Loma Linda: .* 3 schools contribute, including 2 outside Loma Linda\.$/)
+  })
+
+  it('labels the total "All" when every place is selected', () => {
+    renderPanel(['Loma Linda', 'Mentone', 'Redlands'], 1000)
+    expect(rowNames().at(-1)).toBe('All (3)')
+    expect(detail()).toMatch(/^All communities: .*including \d+ outside the study area/)
   })
 
   it('reports analysis errors with a retry button', async () => {
-    const state = idle({ error: 'Database unavailable' })
-    render(
-      <StatisticsPanel
-        places={places}
-        selectedCity={null}
-        subtype={null}
-        facilities={facilities}
-        radius={500}
-        proximity={state}
-      />,
-    )
+    const state = renderPanel([], 500, idle({ error: 'Database unavailable' }))
     expect(screen.getByRole('alert')).toHaveTextContent('Database unavailable')
     await userEvent.click(screen.getByRole('button', { name: 'Retry' }))
     expect(state.retry).toHaveBeenCalledOnce()

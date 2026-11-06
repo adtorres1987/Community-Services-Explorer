@@ -17,10 +17,10 @@ interactive map: Python data pipeline → PostGIS → FastAPI → React + Leafle
 - Map of 173 active public schools in nine communities (612,335 residents),
   colour-coded by school type, plus 32 nearby schools that count toward coverage
 - Schools assigned to communities by boundary, not by mailing address
-- Filters by community and school type; popups with district, grades, enrolment and instruction mode
+- Filters by one or several communities and by school type; popups with district, grades, enrolment and instruction mode
 - Proximity coverage at 500 m, 1 km, 1.5 km or 2 km, computed in PostGIS and drawn on the map
 - Coverage by **population** (2020 census blocks, apportioned by area) and by area
-- Statistics for every community with a weighted total, and the method and its limits stated in the UI
+- Statistics for the selected communities (any combination) with a weighted total, and the method and its limits stated in the UI
 - REST API returning GeoJSON, with OpenAPI docs and explicit error handling
 - Reproducible data pipeline with checksummed sources, and tests at every layer
 

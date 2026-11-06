@@ -54,7 +54,9 @@ jobs:
         run: |
           curl --fail --silent http://localhost:8080/ | grep -q "Community Services Explorer"
           curl --fail --silent http://localhost:8080/api/health
-          curl --fail --silent "http://localhost:8080/api/facilities" | python3 -c "import json, sys; assert len(json.load(sys.stdin)['features']) == 37"
+          # Plumbing only: exact counts are checked by the Python tests
+          curl --fail --silent "http://localhost:8080/api/facilities" | python3 -c "import json, sys; assert json.load(sys.stdin)['features']"
+          curl --fail --silent "http://localhost:8080/api/analysis/proximity?radius_m=500" | python3 -c "import json, sys; assert json.load(sys.stdin)['results']"
       - name: Logs on failure
         if: failure()
         run: docker compose logs

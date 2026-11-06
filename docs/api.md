@@ -71,6 +71,7 @@ census block's population by the share of its area covered.
       "eligible_facilities": 13,
       "excluded_facilities": 0,
       "contributing_facilities": 15,
+      "contributing_facility_ids": [301, 302, "..."],
       "city_area_km2": 73.13,
       "covered_area_km2": 25.82,
       "covered_pct": 35.3,
@@ -88,6 +89,11 @@ census block's population by the share of its area covered.
   (exclusively virtual schools).
 - `contributing_facilities`: eligible facilities anywhere within `radius_m`
   of the place (here 13 in Yucaipa plus 2 nearby).
+- `contributing_facility_ids`: their ids. A school near a shared boundary
+  contributes to both places, so to combine several places count the
+  **distinct** ids rather than summing `contributing_facilities` (e.g. Colton
+  and Rialto at 1 km: 62 distinct schools, 67 if summed). Population and area
+  can be summed directly to get weighted percentages.
 - A `facility_type` with no facilities returns zeros and `coverage: null`.
 - All nine places take 0.6–0.8 s; pass `city` for a single place.
 

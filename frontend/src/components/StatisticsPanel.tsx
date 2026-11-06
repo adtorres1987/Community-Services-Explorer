@@ -1,11 +1,14 @@
-import type { CityProperties, CityProximity, FacilityCollection, ProximityResponse } from '../services/api'
+import type { CityProperties, FacilityCollection, ProximityResponse } from '../services/api'
 import type { RequestState } from '../services/useRequest'
+import { percent, summarizeCoverage } from '../features/facilities/coverage'
+import { isSelected } from '../features/facilities/schools'
 
 interface Props {
   places: CityProperties[]
-  selectedCity: string | null
+  /** Selected places; empty means all */
+  selectedCities: string[]
   subtype: string | null
-  // Study-area facilities matching the type filter, so all places can be compared
+  // Study-area facilities matching the type filter
   facilities: FacilityCollection['features']
   radius: number | null
   proximity: RequestState<ProximityResponse>
@@ -15,37 +18,27 @@ function formatRadius(radius: number) {
   return radius >= 1000 ? `${radius / 1000} km` : `${radius} m`
 }
 
-function percent(part: number, whole: number) {
-  return whole ? `${((100 * part) / whole).toFixed(1)}%` : '—'
-}
-
 const number = new Intl.NumberFormat('en-US')
-
-function totals(results: CityProximity[]) {
-  return results.reduce(
-    (sum, r) => ({
-      population: sum.population + r.population,
-      covered_population: sum.covered_population + r.covered_population,
-      area: sum.area + r.city_area_km2,
-      covered_area: sum.covered_area + r.covered_area_km2,
-    }),
-    { population: 0, covered_population: 0, area: 0, covered_area: 0 },
-  )
-}
 
 export function StatisticsPanel({
   places,
-  selectedCity,
+  selectedCities,
   subtype,
   facilities,
   radius,
   proximity,
 }: Props) {
-  const results = proximity.data?.results ?? []
+  const shown = places.filter((p) => isSelected(p.name, selectedCities))
+  const isPartial = shown.length < places.length
+  const shownNames = new Set(shown.map((p) => p.name))
+  const results = (proximity.data?.results ?? []).filter((r) => shownNames.has(r.city))
+  const summary = summarizeCoverage(results)
   const showCoverage = radius !== null
-  const all = totals(results)
-  const allPopulation = places.reduce((sum, p) => sum + p.population, 0)
-  const detail = results.find((r) => r.city === selectedCity)
+  const schoolsIn = (name: string) => facilities.filter((f) => f.properties.city === name).length
+  const totalSchools = shown.reduce((sum, p) => sum + schoolsIn(p.name), 0)
+  const totalPopulation = shown.reduce((sum, p) => sum + p.population, 0)
+  const totalLabel = isPartial ? `Selected (${shown.length})` : `All (${shown.length})`
+  const outside = summary.contributing - summary.eligible
 
   return (
     <section className="panel" aria-labelledby="stats-heading">
@@ -71,16 +64,15 @@ export function StatisticsPanel({
           </tr>
         </thead>
         <tbody>
-          {places.map((place) => {
+          {shown.map((place) => {
             const result = results.find((r) => r.city === place.name)
-            const schools = facilities.filter((f) => f.properties.city === place.name).length
             return (
-              <tr key={place.name} className={place.name === selectedCity ? 'is-selected' : undefined}>
+              <tr key={place.name}>
                 <th scope="row">
                   {place.name}
                   {place.place_type === 'CDP' && <span className="tag">CDP</span>}
                 </th>
-                <td>{schools}</td>
+                <td>{schoolsIn(place.name)}</td>
                 {showCoverage ? (
                   <>
                     <td>{result ? `${result.covered_population_pct.toFixed(1)}%` : '—'}</td>
@@ -93,20 +85,23 @@ export function StatisticsPanel({
             )
           })}
         </tbody>
-        <tfoot>
-          <tr>
-            <th scope="row">All</th>
-            <td>{facilities.length}</td>
-            {showCoverage ? (
-              <>
-                <td>{results.length ? percent(all.covered_population, all.population) : '—'}</td>
-                <td>{results.length ? percent(all.covered_area, all.area) : '—'}</td>
-              </>
-            ) : (
-              <td>{number.format(allPopulation)}</td>
-            )}
-          </tr>
-        </tfoot>
+        {/* A single place needs no total row */}
+        {shown.length > 1 && (
+          <tfoot>
+            <tr>
+              <th scope="row">{totalLabel}</th>
+              <td>{totalSchools}</td>
+              {showCoverage ? (
+                <>
+                  <td>{results.length ? percent(summary.coveredPopulation, summary.population) : '—'}</td>
+                  <td>{results.length ? percent(summary.coveredAreaKm2, summary.areaKm2) : '—'}</td>
+                </>
+              ) : (
+                <td>{number.format(totalPopulation)}</td>
+              )}
+            </tr>
+          </tfoot>
+        )}
       </table>
 
       {proximity.error && (
@@ -118,25 +113,31 @@ export function StatisticsPanel({
         </p>
       )}
 
-      {showCoverage && detail && (
+      {showCoverage && results.length > 0 && (
         <p className="stats-detail">
-          <strong>{detail.city}:</strong> {number.format(detail.covered_population)} of{' '}
-          {number.format(detail.population)} residents and {detail.covered_area_km2} of{' '}
-          {detail.city_area_km2} km² are within {formatRadius(radius)} of a school.{' '}
-          {detail.contributing_facilities} school
-          {detail.contributing_facilities === 1 ? '' : 's'} contribute
-          {detail.contributing_facilities === 1 ? 's' : ''}, including{' '}
-          {detail.contributing_facilities - detail.eligible_facilities} outside {detail.city}
-          {detail.excluded_facilities > 0 &&
-            `; ${detail.excluded_facilities} exclusively virtual excluded`}
-          .
+          <strong>
+            {shown.length === 1 ? shown[0].name : isPartial ? `${shown.length} selected communities` : 'All communities'}
+            :
+          </strong>{' '}
+          {number.format(summary.coveredPopulation)} of {number.format(summary.population)} residents
+          ({percent(summary.coveredPopulation, summary.population)}) and{' '}
+          {summary.coveredAreaKm2.toFixed(2)} of {summary.areaKm2.toFixed(2)} km² are within{' '}
+          {formatRadius(radius)} of a school. {summary.contributing} school
+          {summary.contributing === 1 ? '' : 's'} contribute
+          {summary.contributing === 1 ? 's' : ''}
+          {outside > 0 &&
+            `, including ${outside} outside ${
+              shown.length === 1 ? shown[0].name : isPartial ? 'the selection' : 'the study area'
+            }`}
+          {summary.excluded > 0 && `; ${summary.excluded} exclusively virtual excluded`}.
         </p>
       )}
 
       <p className="caveat">
         Schools are assigned to the community whose boundary contains them. Proximity is
         straight-line distance, not travel by street. Residents are 2020 census block counts,
-        apportioned by area. Nothing here measures capacity, quality or enrolment boundaries.
+        apportioned by area. Totals are weighted by population and area. Nothing here measures
+        capacity, quality or enrolment boundaries.
       </p>
     </section>
   )

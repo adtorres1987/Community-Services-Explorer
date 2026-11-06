@@ -44,6 +44,20 @@ def test_all_places_and_virtual_exclusion(client):
     assert "Straight-line" in body["method"]
 
 
+def test_contributing_ids_allow_distinct_counts_across_places(client):
+    results = {
+        r["city"]: r
+        for r in client.get("/analysis/proximity", params={"radius_m": 1000}).json()["results"]
+    }
+    for result in results.values():
+        assert len(result["contributing_facility_ids"]) == result["contributing_facilities"]
+    # Schools near the Redlands / Loma Linda boundary contribute to both places
+    redlands = set(results["Redlands"]["contributing_facility_ids"])
+    loma_linda = set(results["Loma Linda"]["contributing_facility_ids"])
+    assert redlands & loma_linda
+    assert len(redlands | loma_linda) < len(redlands) + len(loma_linda)
+
+
 def test_neighbouring_schools_add_coverage(client):
     # Yucaipa has 13 eligible schools of its own; two more nearby reach it at 1 km
     [result] = client.get(
@@ -67,6 +81,7 @@ def test_type_without_facilities_has_no_coverage(client):
     [result] = body["results"]
     assert result["eligible_facilities"] == 0
     assert result["contributing_facilities"] == 0
+    assert result["contributing_facility_ids"] == []
     assert result["covered_pct"] == 0
     assert result["covered_population"] == 0
     assert result["coverage"] is None

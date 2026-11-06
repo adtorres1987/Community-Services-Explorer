@@ -173,6 +173,53 @@ select {
   color: var(--text);
 }
 
+.checklist__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.checklist__actions {
+  display: flex;
+  gap: 4px;
+}
+
+.checklist__actions button {
+  padding: 1px 10px;
+  font-size: 0.8rem;
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.checklist {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px 12px;
+}
+
+.checklist label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+
+.checklist input {
+  margin: 0;
+  accent-color: var(--accent);
+}
+
+.hint {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
 .segmented {
   display: flex;
   border: 1px solid var(--border);

@@ -53,6 +53,8 @@ export interface CityProximity {
   excluded_facilities: number
   /** Eligible facilities anywhere within the radius, including neighbouring places */
   contributing_facilities: number
+  /** Their ids, to count distinct facilities across several places */
+  contributing_facility_ids: number[]
   city_area_km2: number
   covered_area_km2: number
   covered_pct: number

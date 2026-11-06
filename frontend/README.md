@@ -42,7 +42,11 @@ Tests sit next to the code they cover (`*.test.ts`, `*.test.tsx`).
 
 - Facilities are loaded once (~200 records) and filtered in the browser. The
   proximity analysis is requested from the API for each radius / school type.
-- Selecting a community highlights its schools; schools in other communities
+- One or several communities can be selected (no selection = all). The
+  statistics table then lists only the selected communities with a weighted
+  total, and one sentence summarizes the selection; contributing schools are
+  counted once by id (`features/facilities/coverage.ts`).
+- Selecting communities highlights their schools; schools in other communities
   and context schools stay on the map, faded, because they still count toward
   coverage. Schools of other types are hidden, since coverage uses only the
   selected type.

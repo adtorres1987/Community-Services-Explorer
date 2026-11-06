@@ -8,6 +8,8 @@ class CityProximity(BaseModel):
     eligible_facilities: int  # proximity-eligible facilities inside the place
     excluded_facilities: int  # inside the place but not eligible (exclusively virtual)
     contributing_facilities: int  # eligible facilities anywhere within the radius of the place
+    # Their ids, so clients can count distinct facilities across several places
+    contributing_facility_ids: list[int]
     city_area_km2: float
     covered_area_km2: float
     covered_pct: float

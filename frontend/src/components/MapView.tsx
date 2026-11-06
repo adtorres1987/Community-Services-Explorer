@@ -2,7 +2,7 @@ import { useEffect } from 'react'
 import { geoJSON } from 'leaflet'
 import { CircleMarker, GeoJSON, MapContainer, Pane, Popup, TileLayer, useMap } from 'react-leaflet'
 import type { CityCollection, CityProximity, FacilityCollection } from '../services/api'
-import { CATEGORY_COLORS, schoolCategory } from '../features/facilities/schools'
+import { CATEGORY_COLORS, isSelected, schoolCategory } from '../features/facilities/schools'
 import {
   BASEMAP,
   BOUNDARY_STYLE,
@@ -18,26 +18,28 @@ interface Props {
   /** Facilities drawn at full strength; the others are faded */
   focusedIds: Set<number>
   coverage: CityProximity[]
-  selectedCity: string | null
+  /** Selected places; empty means all */
+  selectedCities: string[]
 }
 
-function FitToCities({ cities, selectedCity }: { cities: CityCollection; selectedCity: string | null }) {
+function FitToCities({ cities, selectionKey }: { cities: CityCollection; selectionKey: string }) {
   const map = useMap()
 
   useEffect(() => {
-    const features = cities.features.filter(
-      (f) => selectedCity === null || f.properties.name === selectedCity,
-    )
+    const selected = selectionKey ? selectionKey.split('|') : []
+    const features = cities.features.filter((f) => isSelected(f.properties.name, selected))
     if (features.length === 0) return
     map.fitBounds(geoJSON(features).getBounds(), {
       padding: [24, 24],
     })
-  }, [map, cities, selectedCity])
+    // Keyed by the selection string, not the array, so it only refits when the selection changes
+  }, [map, cities, selectionKey])
 
   return null
 }
 
-export function MapView({ cities, facilities, focusedIds, coverage, selectedCity }: Props) {
+export function MapView({ cities, facilities, focusedIds, coverage, selectedCities }: Props) {
+  const selectionKey = selectedCities.join('|')
   return (
     <MapContainer
       center={INITIAL_CENTER}
@@ -66,7 +68,18 @@ export function MapView({ cities, facilities, focusedIds, coverage, selectedCity
       </Pane>
 
       <Pane name="boundaries" style={{ zIndex: 380 }}>
-        {cities && <GeoJSON data={cities} style={BOUNDARY_STYLE} interactive={false} />}
+        {cities && (
+          <GeoJSON
+            // Re-created when the selection changes so unselected boundaries can be dimmed
+            key={selectionKey}
+            data={cities}
+            style={(feature) => ({
+              ...BOUNDARY_STYLE,
+              opacity: isSelected(feature?.properties.name, selectedCities) ? 1 : 0.35,
+            })}
+            interactive={false}
+          />
+        )}
       </Pane>
 
       {facilities.map((facility) => {
@@ -94,7 +107,7 @@ export function MapView({ cities, facilities, focusedIds, coverage, selectedCity
         )
       })}
 
-      {cities && <FitToCities cities={cities} selectedCity={selectedCity} />}
+      {cities && <FitToCities cities={cities} selectionKey={selectionKey} />}
     </MapContainer>
   )
 }
