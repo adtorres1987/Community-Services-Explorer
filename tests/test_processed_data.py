@@ -15,6 +15,11 @@ POPULATION_BY_PLACE = {
     "Mentone": 9557, "Redlands": 73161, "Rialto": 104063, "San Bernardino": 222042,
     "Yucaipa": 54541,
 }
+POPULATION_5_17_BY_PLACE = {
+    "Colton": 10689, "Grand Terrace": 2129, "Highland": 11893, "Loma Linda": 3550,
+    "Mentone": 1712, "Redlands": 12118, "Rialto": 21785, "San Bernardino": 46869,
+    "Yucaipa": 9724,
+}
 
 
 @pytest.fixture(scope="module")
@@ -61,6 +66,14 @@ def test_population(cities, units):
     assert dict(zip(cities["city"], cities["population"])) == POPULATION_BY_PLACE
     by_place = units.groupby("city")["population"].sum().round().astype(int).to_dict()
     assert by_place == POPULATION_BY_PLACE
+
+
+def test_population_5_17(cities, units):
+    assert dict(zip(cities["city"], cities["population_5_17"])) == POPULATION_5_17_BY_PLACE
+    by_place = units.groupby("city")["population_5_17"].sum().round().astype(int).to_dict()
+    assert by_place == POPULATION_5_17_BY_PLACE
+    assert (units["population_5_17"] >= 0).all()
+    assert (units["population_5_17"] <= units["population"] + 1e-9).all()
 
 
 def test_records_are_valid(schools, cities, units):

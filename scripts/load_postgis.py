@@ -17,6 +17,8 @@ GPKG_PATH = ROOT / "data/processed/study_area.gpkg"
 SRID = 26911
 SCHOOLS_SOURCE = "cde_public_schools_2025_26"
 BOUNDARIES_SOURCE = "census_tiger_2026_place"
+# Name kept from the first load so re-runs replace those rows; the units now also
+# carry the DHC population aged 5-17
 POPULATION_SOURCE = "census_2020_pl_blocks"
 
 SCHOOL_ATTRIBUTES = [
@@ -67,23 +69,26 @@ with psycopg.connect(conninfo) as conn, conn.cursor() as cur:
 
     cur.executemany(
         """
-        INSERT INTO city_boundaries (geoid, name, place_type, population, source_name, geom)
-        VALUES (%s, %s, %s, %s, %s, ST_Multi(ST_GeomFromWKB(%s, %s)))
+        INSERT INTO city_boundaries (
+            geoid, name, place_type, population, population_5_17, source_name, geom
+        )
+        VALUES (%s, %s, %s, %s, %s, %s, ST_Multi(ST_GeomFromWKB(%s, %s)))
         """,
         [
             (r["geoid"], r["city"], place_type(r["name_lsad"]), r["population"],
-             BOUNDARIES_SOURCE, r["wkb"], SRID)
+             r["population_5_17"], BOUNDARIES_SOURCE, r["wkb"], SRID)
             for r in records(cities)
         ],
     )
 
     cur.executemany(
         """
-        INSERT INTO population_units (geoid20, city, source_name, population, geom)
-        VALUES (%s, %s, %s, %s, ST_Multi(ST_GeomFromWKB(%s, %s)))
+        INSERT INTO population_units (geoid20, city, source_name, population, population_5_17, geom)
+        VALUES (%s, %s, %s, %s, %s, ST_Multi(ST_GeomFromWKB(%s, %s)))
         """,
         [
-            (r["geoid20"], r["city"], POPULATION_SOURCE, r["population"], r["wkb"], SRID)
+            (r["geoid20"], r["city"], POPULATION_SOURCE, r["population"], r["population_5_17"],
+             r["wkb"], SRID)
             for r in records(units)
         ],
     )

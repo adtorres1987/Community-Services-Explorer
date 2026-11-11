@@ -42,6 +42,14 @@ SOURCES = [
         # Only the geographic header is needed: it carries POP100 for every block
         "extract": ["cageo2020.pl"],
     },
+    {
+        "name": "Census 2020 Demographic and Housing Characteristics File (DHC), California",
+        "url": "https://www2.census.gov/programs-surveys/decennial/2020/data/demographic-and-housing-characteristics-file/California/ca2020.dhc.zip",
+        "path": RAW_DIR / "ca2020.dhc/ca2020.dhc.zip",
+        "sha256": "380711a2de1313fea48f2184810baccc83e36643f145daab4a2f37130d815c61",
+        # ~1 GB; only the geographic header and segment 6 (table P12, sex by age) are needed
+        "extract": ["cageo2020.dhc", "ca000062020.dhc"],
+    },
 ]
 
 

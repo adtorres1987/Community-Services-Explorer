@@ -3,6 +3,7 @@ import { FilterPanel } from './components/FilterPanel'
 import { Legend } from './components/Legend'
 import { MapView } from './components/MapView'
 import { StatisticsPanel } from './components/StatisticsPanel'
+import { hasAgeData, type PopulationGroup } from './features/facilities/coverage'
 import { isInFocus, isSelected, matchesSubtype } from './features/facilities/schools'
 import { fetchCities, fetchFacilities, fetchProximity } from './services/api'
 import { useRequest } from './services/useRequest'
@@ -12,6 +13,7 @@ export default function App() {
   const [selectedCities, setSelectedCities] = useState<string[]>([])
   const [subtype, setSubtype] = useState<string | null>(null)
   const [radius, setRadius] = useState<number | null>(null)
+  const [populationGroup, setPopulationGroup] = useState<PopulationGroup>('all')
 
   const cities = useRequest('cities', fetchCities)
   const facilities = useRequest('facilities', fetchFacilities)
@@ -22,6 +24,9 @@ export default function App() {
 
   const allFacilities = useMemo(() => facilities.data?.features ?? [], [facilities.data])
   const places = useMemo(() => cities.data?.features.map((f) => f.properties) ?? [], [cities.data])
+  // Until the places load, keep the option enabled rather than flash a warning
+  const ageDataAvailable = places.length === 0 || hasAgeData(places)
+  const group = ageDataAvailable ? populationGroup : 'all'
   const subtypes = useMemo(
     () =>
       [...new Set(allFacilities.map((f) => f.properties.facility_subtype))]
@@ -101,14 +106,18 @@ export default function App() {
             cities={selectedCities}
             subtype={subtype}
             radius={radius}
+            populationGroup={group}
+            ageDataAvailable={ageDataAvailable}
             onCitiesChange={setSelectedCities}
             onSubtypeChange={setSubtype}
             onRadiusChange={setRadius}
+            onPopulationGroupChange={setPopulationGroup}
           />
           <StatisticsPanel
             places={places}
             selectedCities={selectedCities}
             subtype={subtype}
+            populationGroup={group}
             facilities={studySchools}
             radius={radius}
             proximity={proximity}
@@ -116,8 +125,8 @@ export default function App() {
           <Legend />
           <footer className="sources">
             Data: California Department of Education, California Public Schools 2025–26;
-            U.S. Census Bureau, TIGER/Line 2026 Places, 2020 Census blocks and P.L. 94-171
-            population.
+            U.S. Census Bureau, TIGER/Line 2026 Places, 2020 Census blocks, P.L. 94-171
+            population and DHC ages 5–17.
           </footer>
         </aside>
       </main>

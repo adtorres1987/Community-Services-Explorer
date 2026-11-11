@@ -14,8 +14,10 @@ These are the known limitations.
 - **Proximity is not access.** The analysis ignores enrolment boundaries,
   school choice, capacity, grade levels served, transport and quality.
   A school nearby may not be one a given student can attend.
-- **All residents, not school-age children.** Population is the 2020 total
-  (`POP100`), not children of school age.
+- **School-age is by age only.** "Ages 5–17" counts residents of that age
+  (2020 DHC), not enrolled students: it includes children who are home-schooled
+  or attend private schools, and excludes pre-kindergarten. All residents
+  (`POP100`) remain available.
 
 ## Population estimate
 
@@ -26,11 +28,21 @@ These are the known limitations.
   urban edge (foothills, washes) can be off.
 - **Different years.** Population is from 2020, boundaries from 2026 and
   schools from 2025–26. Growth and annexations since 2020 are not reflected.
+- **Ages 5–17 date faster than totals.** The 2020 children are 11–23 in 2026;
+  the share near schools describes where school-age children lived in 2020,
+  which is a reasonable proxy for where families live, not a current count.
+- **Noise in block age counts.** 2020 Census counts include
+  disclosure-avoidance noise. A single block's age count can be off by a few
+  people; sums over a community (thousands of blocks) are reliable, single
+  blocks are not, which is why the app never shows them.
 - **Simplified blocks.** Block geometry is simplified with a 1 m tolerance
   after the population is computed (total area changes by ~0.003 %).
 - **Area vs. people.** Both are reported because they diverge: in Redlands,
   40 % of the land but 75 % of residents are within 1 km of a school; the
   remaining land is largely hills and open space.
+- **Children live closer to schools.** At 1 km, 84.2 % of residents aged 5–17
+  are near a school versus 81.8 % of all residents, and the share is higher
+  in every community; both measures are shown so the gap is visible.
 
 ## Data choices that affect the numbers
 

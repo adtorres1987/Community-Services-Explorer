@@ -11,6 +11,7 @@ class CityProperties(BaseModel):
     place_type: str  # "city" or "CDP" (unincorporated census-designated place)
     area_km2: float
     population: int  # 2020 census, apportioned from blocks
+    population_5_17: int | None  # aged 5-17 (2020 DHC); null before migration 003
     facility_count: int  # facilities inside the boundary
 
 

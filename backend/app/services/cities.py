@@ -11,6 +11,7 @@ def list_cities(conn: Connection) -> CityCollection:
             b.name,
             b.place_type,
             b.population,
+            b.population_5_17,
             ST_Area(b.geom) / 1e6 AS area_km2,
             (SELECT count(*) FROM facilities f WHERE f.city = b.name) AS facility_count,
             ST_AsGeoJSON(ST_Transform(b.geom, 4326), 6)::json AS geometry
@@ -29,6 +30,7 @@ def list_cities(conn: Connection) -> CityCollection:
                     place_type=row["place_type"],
                     area_km2=round(row["area_km2"], 2),
                     population=row["population"],
+                    population_5_17=row["population_5_17"],
                     facility_count=row["facility_count"],
                 ),
             )

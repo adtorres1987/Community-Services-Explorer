@@ -4,11 +4,12 @@
  CDE schools GeoJSON ───────┐
  TIGER/Line 2026 places ────┤
  TIGER/Line 2020 blocks ────┼─ scripts/download_data.py ─► data/raw/ (not committed)
- Census 2020 P.L. 94-171 ───┘
+ Census 2020 P.L. 94-171 ───┤
+ Census 2020 DHC (ages) ────┘
                          │
                          ▼
               scripts/prepare_study_area.py   assign by boundary, context schools,
-                         │                    apportion block population
+                         │                    apportion block population (total, 5–17)
                          ▼
           data/processed/study_area.gpkg   (committed, ~3 MB, EPSG:26911)
                          │

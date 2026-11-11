@@ -109,6 +109,39 @@ legal survey boundaries. CDP boundaries are statistical, not administrative.
   population of San Bernardino County, and every block geometry has a count.
 - The Census API now requires a key; the bulk files do not.
 
+## 2020 Census ages 5–17 — DHC table P12
+
+| Item | Value |
+|---|---|
+| Publisher | U.S. Census Bureau |
+| Dataset | 2020 Census Demographic and Housing Characteristics File (DHC), California |
+| URL | https://www2.census.gov/programs-surveys/decennial/2020/data/demographic-and-housing-characteristics-file/California/ca2020.dhc.zip |
+| SHA-256 (zip) | `380711a2de1313fea48f2184810baccc83e36643f145daab4a2f37130d815c61` (1,057,231,771 bytes) |
+| Rights | Public domain (U.S. Government work) |
+| Downloaded | 2026-11-10 |
+| Local files | `data/raw/ca2020.dhc/` (not committed) |
+
+- Table **P12 (Sex by age for selected age categories)** is published down to
+  the block. Ages 5–17 = cells 4–6 (male 5–9, 10–14, 15–17) + cells 28–30
+  (female). The table is in data segment 6 (`ca000062020.dhc`), after P10
+  (71 cells) and P11 (73), per the Census `table_segments_dhc.csv`; only that
+  segment and the geographic header `cageo2020.dhc` are extracted.
+- DHC block records are `SUMLEV = 100` (not 750 as in P.L. 94-171) and join
+  to the data segment on `LOGRECNO`.
+- Checks: every P12 block record is internally consistent (total = male +
+  female, each the sum of its age groups); the 35,839 blocks sum to
+  **417,313** residents aged 5–17, equal to the DHC county record; and the
+  DHC block totals (`POP100`) equal the P.L. 94-171 totals for every block.
+- **Why DHC, not the ACS:** DHC counts are by block, so they use the same
+  area apportionment as the total population, and have no sampling error.
+  ACS 5-year estimates are more recent but only reach block groups and carry
+  margins of error.
+- **Disclosure avoidance.** 2020 Census counts below the state level include
+  statistical noise (differential privacy). Block-level age counts are noisy
+  individually; the Census Bureau recommends aggregating them, which the
+  analysis does (thousands of blocks per community). Totals by block are
+  not affected beyond what P.L. 94-171 already includes.
+
 ## Processing (`scripts/prepare_study_area.py`)
 
 Writes `data/processed/study_area.gpkg` (EPSG:26911), committed to the repository.
@@ -130,7 +163,8 @@ Writes `data/processed/study_area.gpkg` (EPSG:26911), committed to the repositor
 5. Clip 2020 blocks to the study places. A block split by a boundary gets
    population in proportion to the area on each side (2020 blocks do not nest
    exactly in 2026 boundaries; 344 blocks are split).
-6. Simplify the clipped blocks with a 1 m tolerance *after* computing
+6. Ages 5–17 (DHC) are apportioned the same way, block by block.
+7. Simplify the clipped blocks with a 1 m tolerance *after* computing
    population, to keep the committed file small (~0.003 % area change).
 
 **Working CRS:** EPSG:26911 (NAD83 / UTM zone 11N, metres). EPSG:3857 is not
@@ -141,21 +175,21 @@ suitable for distance measurement (≈0.83 true metres per unit at 34°N).
 | Layer | Features | Notes |
 |---|---|---|
 | `schools` | 205 | 173 in the study area + 32 context; 7 not proximity eligible |
-| `city_boundaries` | 9 | With 2020 `population` |
-| `population_units` | 6,839 | 6,487 blocks clipped to places, apportioned `population` |
+| `city_boundaries` | 9 | With 2020 `population` and `population_5_17` |
+| `population_units` | 6,839 | 6,487 blocks clipped to places, apportioned `population` and `population_5_17` |
 
-| Place | Schools | Population (2020) |
-|---|---|---|
-| Colton | 15 | 53,915 |
-| Grand Terrace | 4 | 13,148 |
-| Highland | 10 | 56,969 |
-| Loma Linda | 2 | 24,939 |
-| Mentone | 2 | 9,557 |
-| Redlands | 22 | 73,161 |
-| Rialto | 28 | 104,063 |
-| San Bernardino | 77 | 222,042 |
-| Yucaipa | 13 | 54,541 |
-| **Total** | **173** | **612,335** |
+| Place | Schools | Population (2020) | Ages 5–17 (2020) |
+|---|---|---|---|
+| Colton | 15 | 53,915 | 10,689 |
+| Grand Terrace | 4 | 13,148 | 2,129 |
+| Highland | 10 | 56,969 | 11,893 |
+| Loma Linda | 2 | 24,939 | 3,550 |
+| Mentone | 2 | 9,557 | 1,712 |
+| Redlands | 22 | 73,161 | 12,118 |
+| Rialto | 28 | 104,063 | 21,785 |
+| San Bernardino | 77 | 222,042 | 46,869 |
+| Yucaipa | 13 | 54,541 | 9,724 |
+| **Total** | **173** | **612,335** | **120,469** |
 
 Context schools by address city: Fontana 16, San Bernardino (unincorporated) 8,
 Bloomington 5, Riverside 2, Calimesa 1 (29 in San Bernardino County, 3 in

@@ -46,6 +46,9 @@ Tests sit next to the code they cover (`*.test.ts`, `*.test.tsx`).
   statistics table then lists only the selected communities with a weighted
   total, and one sentence summarizes the selection; contributing schools are
   counted once by id (`features/facilities/coverage.ts`).
+- "Population" switches the statistics between all residents and residents
+  aged 5–17; area and the map do not change. The option is disabled if the
+  API returns no age data (database loaded before migration 003).
 - Selecting communities highlights their schools; schools in other communities
   and context schools stay on the map, faded, because they still count toward
   coverage. Schools of other types are hidden, since coverage uses only the

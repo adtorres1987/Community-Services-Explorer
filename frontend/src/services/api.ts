@@ -42,6 +42,8 @@ export interface CityProperties {
   place_type: string
   area_km2: number
   population: number
+  /** Aged 5–17 (2020 DHC); null if the database predates migration 003 */
+  population_5_17: number | null
   facility_count: number
 }
 
@@ -61,6 +63,9 @@ export interface CityProximity {
   population: number
   covered_population: number
   covered_population_pct: number
+  population_5_17: number | null
+  covered_population_5_17: number | null
+  covered_population_5_17_pct: number | null
   coverage: Polygon | MultiPolygon | null
 }
 

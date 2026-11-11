@@ -1,3 +1,4 @@
+import { POPULATION_GROUPS, type PopulationGroup } from '../features/facilities/coverage'
 import type { CityProperties } from '../services/api'
 
 interface Props {
@@ -7,9 +8,13 @@ interface Props {
   cities: string[]
   subtype: string | null
   radius: number | null
+  populationGroup: PopulationGroup
+  /** False if the database has no age data (loaded before migration 003) */
+  ageDataAvailable: boolean
   onCitiesChange: (cities: string[]) => void
   onSubtypeChange: (subtype: string | null) => void
   onRadiusChange: (radius: number | null) => void
+  onPopulationGroupChange: (group: PopulationGroup) => void
 }
 
 const RADIUS_OPTIONS: { value: number | null; label: string }[] = [
@@ -26,9 +31,12 @@ export function FilterPanel({
   cities,
   subtype,
   radius,
+  populationGroup,
+  ageDataAvailable,
   onCitiesChange,
   onSubtypeChange,
   onRadiusChange,
+  onPopulationGroupChange,
 }: Props) {
   const names = places.map((p) => p.name)
 
@@ -103,6 +111,27 @@ export function FilterPanel({
             </label>
           ))}
         </div>
+      </fieldset>
+
+      <fieldset className="field">
+        <legend>Population</legend>
+        <div className="segmented">
+          {(Object.keys(POPULATION_GROUPS) as PopulationGroup[]).map((group) => (
+            <label key={group}>
+              <input
+                type="radio"
+                name="population"
+                checked={populationGroup === group}
+                disabled={group === 'age_5_17' && !ageDataAvailable}
+                onChange={() => onPopulationGroupChange(group)}
+              />
+              <span>{POPULATION_GROUPS[group].label}</span>
+            </label>
+          ))}
+        </div>
+        {!ageDataAvailable && (
+          <p className="hint">Age data not loaded: apply migration 003 and reload the database.</p>
+        )}
       </fieldset>
     </section>
   )

@@ -11,7 +11,7 @@
 python scripts/download_data.py
 ```
 
-Downloads the four sources into `raw/` (~110 MB) and verifies their SHA-256 checksums:
+Downloads the five sources into `raw/` (~1.2 GB) and verifies their SHA-256 checksums:
 
 - `raw/california-public-schools-2025-2026.geojson` — CDE California Public
   Schools 2025–26 ("No restrictions on public use")
@@ -19,6 +19,9 @@ Downloads the four sources into `raw/` (~110 MB) and verifies their SHA-256 chec
 - `raw/tl_2020_06071_tabblock20/` — Census TIGER/Line 2020 blocks, San Bernardino County
 - `raw/ca2020.pl/` — Census 2020 P.L. 94-171 redistricting data for
   California; only the geographic header `cageo2020.pl` (block population) is extracted
+- `raw/ca2020.dhc/` — Census 2020 Demographic and Housing Characteristics File for
+  California (1.06 GB zip); only the geographic header `cageo2020.dhc` and segment
+  `ca000062020.dhc` (table P12, sex by age) are extracted (~690 MB)
 
 The Census files are public domain. A checksum mismatch means the publisher
 changed the file. Review the change, update `docs/data-sources.md`, then

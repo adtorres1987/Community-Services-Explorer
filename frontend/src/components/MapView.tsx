@@ -1,6 +1,15 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { geoJSON } from 'leaflet'
-import { CircleMarker, GeoJSON, MapContainer, Pane, Popup, TileLayer, useMap } from 'react-leaflet'
+import {
+  CircleMarker,
+  GeoJSON,
+  MapContainer,
+  Pane,
+  Popup,
+  TileLayer,
+  useMap,
+  useMapEvents,
+} from 'react-leaflet'
 import type { CityCollection, CityProximity, FacilityCollection } from '../services/api'
 import { CATEGORY_COLORS, isSelected, schoolCategory } from '../features/facilities/schools'
 import {
@@ -24,14 +33,31 @@ interface Props {
 
 function FitToCities({ cities, selectionKey }: { cities: CityCollection; selectionKey: string }) {
   const map = useMap()
+  // Leaflet ignores a new fitBounds while a zoom animation runs, so selecting two
+  // places in quick succession would leave the map fitted to the first one
+  const zooming = useRef(false)
+  useMapEvents({
+    zoomstart: () => {
+      zooming.current = true
+    },
+    zoomend: () => {
+      zooming.current = false
+    },
+  })
 
   useEffect(() => {
     const selected = selectionKey ? selectionKey.split('|') : []
     const features = cities.features.filter((f) => isSelected(f.properties.name, selected))
     if (features.length === 0) return
-    map.fitBounds(geoJSON(features).getBounds(), {
-      padding: [24, 24],
-    })
+    const fit = () => map.fitBounds(geoJSON(features).getBounds(), { padding: [24, 24] })
+    if (!zooming.current) {
+      fit()
+      return
+    }
+    map.once('zoomend', fit)
+    return () => {
+      map.off('zoomend', fit)
+    }
     // Keyed by the selection string, not the array, so it only refits when the selection changes
   }, [map, cities, selectionKey])
 

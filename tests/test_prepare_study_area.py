@@ -127,6 +127,65 @@ def test_read_block_population_keeps_county_blocks(tmp_path):
     ]
 
 
+def write_dhc_files(tmp_path, blocks):
+    """Minimal DHC geographic header and segment 6 for (sumlev, geocode, P12 cells) records."""
+    geo_lines, segment_lines = [], []
+    for logrecno, (sumlev, geocode, p12) in enumerate(blocks, start=1):
+        geo = [""] * 97
+        geo[ps.DHC_SUMLEV], geo[ps.DHC_LOGRECNO], geo[ps.DHC_GEOCODE] = sumlev, f"{logrecno:07d}", geocode
+        geo_lines.append("|".join(geo))
+        segment = ["DHCST", "CA", "000", "06", f"{logrecno:07d}"] + ["0"] * (71 + 73) + [str(v) for v in p12]
+        segment += ["0"] * 49  # P12A
+        segment_lines.append("|".join(segment))
+    geo_path, segment_path = tmp_path / "geo.dhc", tmp_path / "seg6.dhc"
+    geo_path.write_text("\n".join(geo_lines) + "\n", encoding="latin-1")
+    segment_path.write_text("\n".join(segment_lines) + "\n", encoding="latin-1")
+    return geo_path, segment_path
+
+
+def p12(**ages):
+    """P12 cells (49) from male/female counts per cell number, e.g. p12(m4=2, f30=1, m20=5)."""
+    cells = [0] * 49
+    for key, count in ages.items():
+        cells[int(key[1:]) - 1] = count
+    cells[1] = sum(cells[2:25])  # male total
+    cells[25] = sum(cells[26:49])  # female total
+    cells[0] = cells[1] + cells[25]
+    return cells
+
+
+def test_read_block_age_5_17_sums_school_age_cells(tmp_path):
+    geo, segment = write_dhc_files(tmp_path, [
+        ("050", "06071", p12(m4=99)),  # county summary, not a block
+        # 5-9, 10-14, 15-17 for both sexes count; under 5 (3, 27) and 18-19 (7, 31) do not
+        ("100", "060710001001000", p12(m3=1, m4=2, m5=3, m6=4, m7=5, f27=1, f28=6, f29=7, f30=8, f31=9)),
+        ("100", "060710001001001", p12(m20=10)),
+        ("100", "060650001001000", p12(m4=50)),  # another county
+    ])
+    assert ps.read_block_age_5_17(geo, segment, "06071").to_dict("records") == [
+        {"GEOID20": "060710001001000", "population_5_17": 30},
+        {"GEOID20": "060710001001001", "population_5_17": 0},
+    ]
+
+
+def test_read_block_age_5_17_rejects_inconsistent_records(tmp_path):
+    cells = p12(m4=2)
+    cells[0] += 1  # total no longer equals male + female
+    geo, segment = write_dhc_files(tmp_path, [("100", "060710001001000", cells)])
+    with pytest.raises(ValueError, match="Inconsistent P12"):
+        ps.read_block_age_5_17(geo, segment, "06071")
+
+
+def test_read_block_age_5_17_requires_every_block(tmp_path):
+    geo, segment = write_dhc_files(tmp_path, [("100", "060710001001000", p12(m4=2))])
+    with geo.open("a", encoding="latin-1") as f:
+        extra = [""] * 97
+        extra[ps.DHC_SUMLEV], extra[ps.DHC_LOGRECNO], extra[ps.DHC_GEOCODE] = "100", "0000002", "060710001001001"
+        f.write("|".join(extra) + "\n")
+    with pytest.raises(ValueError, match="1 of 2 blocks"):
+        ps.read_block_age_5_17(geo, segment, "06071")
+
+
 def test_apportion_population_by_area():
     cities = ps.select_city_boundaries(make_places())
     blocks = gpd.GeoDataFrame(
@@ -141,11 +200,19 @@ def test_apportion_population_by_area():
         },
         crs="EPSG:26911",
     ).to_crs("EPSG:4269")
-    population = pd.DataFrame({"GEOID20": ["inside", "split", "outside"], "population": [100, 80, 40]})
+    population = pd.DataFrame({
+        "GEOID20": ["inside", "split", "outside"],
+        "population": [100, 80, 40],
+        "population_5_17": [20, 10, 8],
+    })
 
     units = ps.apportion_population(blocks, population, cities)
-    totals = units.groupby(["geoid20", "city"])["population"].sum().round(6).to_dict()
-    assert totals == {("inside", "Alpha"): 100, ("split", "Alpha"): 40, ("split", "Beta"): 40}
+    totals = units.groupby(["geoid20", "city"])[["population", "population_5_17"]].sum().round(6)
+    assert totals.to_dict("index") == {
+        ("inside", "Alpha"): {"population": 100, "population_5_17": 20},
+        ("split", "Alpha"): {"population": 40, "population_5_17": 5},
+        ("split", "Beta"): {"population": 40, "population_5_17": 5},
+    }
 
 
 def test_apportion_population_requires_every_block():
