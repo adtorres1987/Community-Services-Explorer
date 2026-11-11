@@ -26,6 +26,7 @@ one-shot `loader` service.
 |---|---|
 | `001_create_tables.sql` | `facilities` and `city_boundaries` (first MVP: Redlands and Yucaipa) |
 | `002_study_places_population.sql` | Assignment by boundary (`city` nullable, `address_city`, `in_city_limits` → `in_study_area`), place type and population on boundaries, `population_units` table |
+| `003_school_age_population.sql` | `population_5_17` (2020 DHC, ages 5–17) on `city_boundaries` and `population_units`; nullable until the data is reloaded |
 
 ## Data model
 
@@ -50,12 +51,12 @@ transforms to EPSG:4326 for GeoJSON output.
 | `geom` | `geometry(Point, 26911)` | GiST index |
 
 **`city_boundaries`** — one row per study place: `geoid`, `name`, `place_type`
-(`city` or `CDP`), `population` (2020), `source_name`,
+(`city` or `CDP`), `population` (2020), `population_5_17` (2020 DHC), `source_name`,
 `geom geometry(MultiPolygon, 26911)` with GiST index.
 
 **`population_units`** — 2020 census blocks clipped to each place: `geoid20`,
-`city` (references `city_boundaries.name`), `population` (apportioned by area,
-fractional), `source_name`, `geom geometry(MultiPolygon, 26911)` with GiST index.
+`city` (references `city_boundaries.name`), `population` and `population_5_17`
+(apportioned by area, fractional), `source_name`, `geom geometry(MultiPolygon, 26911)` with GiST index.
 
 ## Spatial queries
 
@@ -75,28 +76,31 @@ Verified results (2026-11-02):
 - Projected (UTM) and geodesic distances agree to the metre at this scale.
 - Coverage (any eligible school, including neighbouring places and context schools):
 
-| Place | Area 500 m | Area 1 km | Residents 500 m | Residents 1 km |
-|---|---|---|---|---|
-| Colton | 20.1 % | 52.9 % | 37.7 % | 84.8 % |
-| Grand Terrace | 29.2 % | 76.0 % | 36.7 % | 90.4 % |
-| Highland | 16.1 % | 41.4 % | 41.8 % | 83.5 % |
-| Loma Linda | 6.5 % | 25.9 % | 10.1 % | 28.7 % |
-| Mentone | 10.5 % | 30.1 % | 33.8 % | 68.9 % |
-| Redlands | 13.0 % | 39.6 % | 24.2 % | 74.8 % |
-| Rialto | 28.1 % | 65.7 % | 47.5 % | 94.9 % |
-| San Bernardino | 26.1 % | 58.2 % | 45.2 % | 88.3 % |
-| Yucaipa | 11.1 % | 35.3 % | 22.1 % | 59.4 % |
+| Place | Area 500 m | Area 1 km | Residents 500 m | Residents 1 km | Ages 5–17 500 m | Ages 5–17 1 km |
+|---|---|---|---|---|---|---|
+| Colton | 20.1 % | 52.9 % | 37.7 % | 84.8 % | 38.4 % | 85.5 % |
+| Grand Terrace | 29.2 % | 76.0 % | 36.7 % | 90.4 % | 37.5 % | 91.7 % |
+| Highland | 16.1 % | 41.4 % | 41.8 % | 83.5 % | 44.0 % | 86.8 % |
+| Loma Linda | 6.5 % | 25.9 % | 10.1 % | 28.7 % | 11.8 % | 29.9 % |
+| Mentone | 10.5 % | 30.1 % | 33.8 % | 68.9 % | 34.3 % | 71.2 % |
+| Redlands | 13.0 % | 39.6 % | 24.2 % | 74.8 % | 24.5 % | 76.4 % |
+| Rialto | 28.1 % | 65.7 % | 47.5 % | 94.9 % | 47.9 % | 95.1 % |
+| San Bernardino | 26.1 % | 58.2 % | 45.2 % | 88.3 % | 46.5 % | 89.2 % |
+| Yucaipa | 11.1 % | 35.3 % | 22.1 % | 59.4 % | 23.6 % | 61.6 % |
 
   An independent GeoPandas calculation from the GeoPackage (same buffer
-  resolution) gives identical values for area, population and the number of
-  contributing schools.
+  resolution) gives identical values for area, both populations (all four
+  radii for ages 5–17, verified 2026-11-10) and the number of contributing
+  schools.
 
 ## Performance
 
-`/analysis/proximity` for all nine places runs in 0.6–0.8 s on a laptop
-(buffer union, clip to boundaries, then area-weighted sum over ~6,800
+`/analysis/proximity` for all nine places runs in 0.4–0.7 s on a laptop
+(buffer union, clip to boundaries, then area-weighted sums over ~6,800
 population units using the GiST indexes); the response is 160–235 KB with
-coverage geometry.
+coverage geometry. The covered share of each block is computed once in a
+`MATERIALIZED` CTE and reused for both populations; without it PostgreSQL
+inlines the expression into each sum and the query is ~50 % slower.
 
 See [analysis-limitations.md](analysis-limitations.md) for what these numbers
 do and do not measure.

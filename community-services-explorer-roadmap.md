@@ -52,6 +52,19 @@ Mentone (CDP, no incorporada), Redlands, Rialto, San Bernardino y Yucaipa.
 -   Migración `002`, tabla `population_units`; GeoPackage de ~3 MB.
 -   Desarrollado en la rama `feature/san-bernardino-county`.
 
+### Población en edad escolar (5–17 años)
+
+-   Fuente: Censo 2020, archivo DHC, tabla P12 (sexo por edad), por
+    manzana; se eligió frente a la ACS porque mantiene el mismo método
+    por manzana y no tiene margen de error muestral.
+-   120.469 residentes de 5 a 17 años en las nueve comunidades; a 1 km
+    de una escuela, el 84,2 % (frente al 81,8 % de todos los residentes).
+-   Selector "All residents / Ages 5–17" en la aplicación; la API
+    devuelve ambas poblaciones.
+-   Migración `003`; descarga masiva de 1,06 GB solo para reconstruir los
+    datos (el GeoPackage sigue en ~3 MB).
+-   Desarrollado en la rama `feature/school-age-population`.
+
 Documentación técnica: `README.md` y `docs/`.
 
 ------------------------------------------------------------------------

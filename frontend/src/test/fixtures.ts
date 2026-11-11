@@ -53,6 +53,9 @@ export function makeResult(overrides: Partial<CityProximity> = {}): CityProximit
     population: 73161,
     covered_population: 54741,
     covered_population_pct: 74.8,
+    population_5_17: 12118,
+    covered_population_5_17: 9261,
+    covered_population_5_17_pct: 76.4,
     coverage: null,
     ...overrides,
   }
@@ -65,6 +68,7 @@ export function makePlace(name: string, overrides: Partial<CityProperties> = {})
     place_type: 'city',
     area_km2: 10,
     population: 1000,
+    population_5_17: 200,
     facility_count: 0,
     ...overrides,
   }

@@ -16,6 +16,10 @@ class CityProximity(BaseModel):
     population: int
     covered_population: int
     covered_population_pct: float
+    # Residents aged 5-17 (2020 DHC); null if the database predates migration 003
+    population_5_17: int | None
+    covered_population_5_17: int | None
+    covered_population_5_17_pct: float | None
     coverage: Geometry | None  # area within the radius, clipped to the boundary
 
 

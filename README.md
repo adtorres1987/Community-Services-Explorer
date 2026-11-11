@@ -19,29 +19,30 @@ interactive map: Python data pipeline → PostGIS → FastAPI → React + Leafle
 - Schools assigned to communities by boundary, not by mailing address
 - Filters by one or several communities and by school type; popups with district, grades, enrolment and instruction mode
 - Proximity coverage at 500 m, 1 km, 1.5 km or 2 km, computed in PostGIS and drawn on the map
-- Coverage by **population** (2020 census blocks, apportioned by area) and by area
+- Coverage by **population** — all residents or **school-age residents (5–17)** — from
+  2020 census blocks apportioned by area, and by area
 - Statistics for the selected communities (any combination) with a weighted total, and the method and its limits stated in the UI
 - REST API returning GeoJSON, with OpenAPI docs and explicit error handling
 - Reproducible data pipeline with checksummed sources, and tests at every layer
 
-| Community | Schools | Residents within 1 km | Area within 1 km |
-|---|---|---|---|
-| Colton | 15 | 84.8 % | 52.9 % |
-| Grand Terrace | 4 | 90.4 % | 76.0 % |
-| Highland | 10 | 83.5 % | 41.4 % |
-| Loma Linda | 2 | 28.7 % | 25.9 % |
-| Mentone (CDP) | 2 | 68.9 % | 30.1 % |
-| Redlands | 22 | 74.8 % | 39.6 % |
-| Rialto | 28 | 94.9 % | 65.7 % |
-| San Bernardino | 77 | 88.3 % | 58.2 % |
-| Yucaipa | 13 | 59.4 % | 35.3 % |
-| **All nine** | **173** | **81.8 %** | **48.7 %** |
+| Community | Schools | Residents within 1 km | Ages 5–17 within 1 km | Area within 1 km |
+|---|---|---|---|---|
+| Colton | 15 | 84.8 % | 85.5 % | 52.9 % |
+| Grand Terrace | 4 | 90.4 % | 91.7 % | 76.0 % |
+| Highland | 10 | 83.5 % | 86.8 % | 41.4 % |
+| Loma Linda | 2 | 28.7 % | 29.9 % | 25.9 % |
+| Mentone (CDP) | 2 | 68.9 % | 71.2 % | 30.1 % |
+| Redlands | 22 | 74.8 % | 76.4 % | 39.6 % |
+| Rialto | 28 | 94.9 % | 95.1 % | 65.7 % |
+| San Bernardino | 77 | 88.3 % | 89.2 % | 58.2 % |
+| Yucaipa | 13 | 59.4 % | 61.6 % | 35.3 % |
+| **All nine** | **173** | **81.8 %** | **84.2 %** | **48.7 %** |
 
 *Straight-line distance, not travel time; any public school of any type and
 grade level counts. See [analysis limitations](docs/analysis-limitations.md).*
 
 <p>
-  <img src="docs/images/redlands-500m-popup.jpg" alt="Redlands selected at 500 m with a school popup" width="68%">
+  <img src="docs/images/redlands-500m-popup.jpg" alt="Mentone and Redlands at 500 m, counting residents aged 5–17, with a school popup" width="68%">
   <img src="docs/images/mobile.jpg" alt="Mobile layout" width="24%">
 </p>
 
@@ -90,7 +91,7 @@ npm run dev
 ### Rebuilding the data from the original sources
 
 ```bash
-python scripts/download_data.py       # CDE schools + Census boundaries and population (~110 MB), checksum-verified
+python scripts/download_data.py       # CDE schools + Census boundaries and population (~1.2 GB), checksum-verified
 python scripts/prepare_study_area.py  # assign by boundary, add population → data/processed/study_area.gpkg
 python scripts/load_postgis.py
 ```
@@ -98,9 +99,13 @@ python scripts/load_postgis.py
 The study communities are listed by Census GEOID in `STUDY_PLACES` in
 `scripts/prepare_study_area.py`.
 
-If your database was created before migration `002`, either recreate it
-(`docker compose down -v`) or apply `database/migrations/002_study_places_population.sql`
+Most of the download is the 2020 DHC file (1.06 GB), the only bulk source of
+ages by census block; the app itself only needs the committed ~3 MB GeoPackage.
+
+If your database was created before migration `002` or `003`, either recreate it
+(`docker compose down -v`) or apply the missing files in `database/migrations/`
 with `psql`, then reload (see [docs/database.md](docs/database.md)).
+Until then the "Ages 5–17" option is disabled.
 
 ## Tests
 
@@ -146,7 +151,7 @@ docs/           architecture, data sources, database, API, limitations
 |---|---|---|
 | [California Public Schools 2025–26](https://data.ca.gov/@california-department-of-education/california-public-schools-2025-26) | California Department of Education | No restrictions on public use |
 | [TIGER/Line 2026 Places, California](https://www2.census.gov/geo/tiger/TIGER2026/PLACE/) | U.S. Census Bureau | Public domain |
-| [TIGER/Line 2020 blocks](https://www2.census.gov/geo/tiger/TIGER2020PL/LAYER/TABBLOCK/2020/) and [2020 P.L. 94-171 population](https://www2.census.gov/programs-surveys/decennial/2020/data/01-Redistricting_File--PL_94-171/California/) | U.S. Census Bureau | Public domain |
+| [TIGER/Line 2020 blocks](https://www2.census.gov/geo/tiger/TIGER2020PL/LAYER/TABBLOCK/2020/), [2020 P.L. 94-171 population](https://www2.census.gov/programs-surveys/decennial/2020/data/01-Redistricting_File--PL_94-171/California/) and [2020 DHC ages](https://www2.census.gov/programs-surveys/decennial/2020/data/demographic-and-housing-characteristics-file/California/) | U.S. Census Bureau | Public domain |
 | Basemap tiles | © [OpenStreetMap](https://www.openstreetmap.org/copyright) contributors | ODbL; [tile usage policy](https://operations.osmfoundation.org/policies/tiles/) |
 
 Field descriptions, checksums and processing criteria: [docs/data-sources.md](docs/data-sources.md).
@@ -166,7 +171,6 @@ Field descriptions, checksums and processing criteria: [docs/data-sources.md](do
 
 - More community services: parks, libraries, clinics, transit (the `facilities` table is already generic)
 - Network-based accessibility: walking distance and service areas on the street network
-- School-age population (ACS) instead of total population
 - OGC services (WMS/WFS, OGC API Features) and an ArcGIS Maps SDK comparison
 
 ## License

@@ -4,21 +4,21 @@ import pytest
 
 
 @pytest.mark.parametrize(
-    ("city", "radius_m", "area_pct", "population_pct", "contributing"),
+    ("city", "radius_m", "area_pct", "population_pct", "age_5_17_pct", "contributing"),
     [
-        ("Redlands", 500, 13.0, 24.2, 21),
-        ("Redlands", 1000, 39.6, 74.8, 22),
-        ("Yucaipa", 1000, 35.3, 59.4, 15),
-        ("San Bernardino", 1000, 58.2, 88.3, 102),
-        ("Mentone", 500, 10.5, 33.8, 3),
-        ("Loma Linda", 1000, 25.9, 28.7, 5),
-        ("Rialto", 1000, 65.7, 94.9, 43),
-        ("Colton", 500, 20.1, 37.7, 18),
-        ("Grand Terrace", 1000, 76.0, 90.4, 5),
+        ("Redlands", 500, 13.0, 24.2, 24.5, 21),
+        ("Redlands", 1000, 39.6, 74.8, 76.4, 22),
+        ("Yucaipa", 1000, 35.3, 59.4, 61.6, 15),
+        ("San Bernardino", 1000, 58.2, 88.3, 89.2, 102),
+        ("Mentone", 500, 10.5, 33.8, 34.3, 3),
+        ("Loma Linda", 1000, 25.9, 28.7, 29.9, 5),
+        ("Rialto", 1000, 65.7, 94.9, 95.1, 43),
+        ("Colton", 500, 20.1, 37.7, 38.4, 18),
+        ("Grand Terrace", 1000, 76.0, 90.4, 91.7, 5),
     ],
 )
 def test_coverage_matches_verified_values(
-    client, city, radius_m, area_pct, population_pct, contributing
+    client, city, radius_m, area_pct, population_pct, age_5_17_pct, contributing
 ):
     response = client.get("/analysis/proximity", params={"city": city, "radius_m": radius_m})
     assert response.status_code == 200
@@ -26,6 +26,7 @@ def test_coverage_matches_verified_values(
     assert result["city"] == city
     assert result["covered_pct"] == area_pct
     assert result["covered_population_pct"] == population_pct
+    assert result["covered_population_5_17_pct"] == age_5_17_pct
     assert result["contributing_facilities"] == contributing
     assert result["coverage"]["type"] in {"Polygon", "MultiPolygon"}
 
@@ -72,6 +73,15 @@ def test_population_never_exceeds_total(client):
     for result in body["results"]:
         assert 0 <= result["covered_population"] <= result["population"]
         assert 0 <= result["covered_population_pct"] <= 100
+        assert 0 <= result["covered_population_5_17"] <= result["population_5_17"]
+        assert result["population_5_17"] < result["population"]
+
+
+def test_population_5_17_totals(client):
+    # 2020 DHC table P12, ages 5-17 (verified independently with GeoPandas)
+    results = client.get("/analysis/proximity", params={"radius_m": 1000}).json()["results"]
+    assert sum(r["population_5_17"] for r in results) == 120469
+    assert sum(r["covered_population_5_17"] for r in results) == 101455
 
 
 def test_type_without_facilities_has_no_coverage(client):
@@ -84,6 +94,7 @@ def test_type_without_facilities_has_no_coverage(client):
     assert result["contributing_facility_ids"] == []
     assert result["covered_pct"] == 0
     assert result["covered_population"] == 0
+    assert result["covered_population_5_17"] == 0
     assert result["coverage"] is None
 
 

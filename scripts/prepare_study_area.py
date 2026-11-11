@@ -4,9 +4,10 @@ Writes data/processed/study_area.gpkg (EPSG:26911) with three layers:
 
 - schools: active public schools inside a study place, plus "context" schools
   within CONTEXT_DISTANCE_M of a study place that only contribute to coverage
-- city_boundaries: the study place boundaries with their 2020 population
-- population_units: 2020 census blocks clipped to each place, with population
-  apportioned by area
+- city_boundaries: the study place boundaries with their 2020 population, total
+  and aged 5-17
+- population_units: 2020 census blocks clipped to each place, with both
+  populations apportioned by area
 
 "City" in column names means study place; Mentone is an unincorporated
 census-designated place (CDP), the others are incorporated cities.
@@ -26,6 +27,8 @@ SCHOOLS_PATH = RAW / "california-public-schools-2025-2026.geojson"
 PLACES_PATH = RAW / "tl_2026_06_place/tl_2026_06_place.shp"
 BLOCKS_PATH = RAW / "tl_2020_06071_tabblock20/tl_2020_06071_tabblock20.shp"
 PL_GEO_PATH = RAW / "ca2020.pl/cageo2020.pl"
+DHC_GEO_PATH = RAW / "ca2020.dhc/cageo2020.dhc"
+DHC_P12_PATH = RAW / "ca2020.dhc/ca000062020.dhc"  # segment 6: tables P10, P11, P12, P12A
 OUTPUT_PATH = ROOT / "data/processed/study_area.gpkg"
 
 COUNTY_GEOCODE = "06071"  # San Bernardino County, CA
@@ -58,6 +61,18 @@ KEEP_COLUMNS = [
 # Positions in the P.L. 94-171 geographic header (pipe-delimited, 97 fields)
 PL_SUMLEV, PL_GEOCODE, PL_POP100 = 2, 9, 90
 PL_BLOCK_SUMLEV = "750"
+
+# DHC geographic header: same 97-field layout; records join to segments by LOGRECNO.
+# Blocks are summary level 100 in the DHC (750 is the P.L. 94-171 tabulation block).
+DHC_SUMLEV, DHC_LOGRECNO, DHC_GEOCODE = 2, 7, 9
+DHC_BLOCK_SUMLEV = "100"
+# Segment 6 records: FILEID|STUSAB|CHARITER|CIFSN|LOGRECNO, then P10 (71 cells),
+# P11 (73) and P12 (49), per the Census table_segments_dhc.csv
+SEGMENT_LOGRECNO = 4
+P12_START = 5 + 71 + 73
+P12_CELLS = 49
+# P12 cells (1-based) for ages 5-9, 10-14 and 15-17: male 4-6, female 28-30
+P12_AGE_5_17 = (4, 5, 6, 28, 29, 30)
 
 
 def select_city_boundaries(places: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
@@ -122,32 +137,62 @@ def read_block_population(path: Path, county_geocode: str = COUNTY_GEOCODE) -> p
     return pd.DataFrame(rows, columns=["GEOID20", "population"])
 
 
+def read_block_age_5_17(
+    geo_path: Path, segment_path: Path, county_geocode: str = COUNTY_GEOCODE
+) -> pd.DataFrame:
+    """2020 population aged 5-17 of each census block in the county (DHC table P12)."""
+    geocodes = {}
+    with geo_path.open(encoding="latin-1", newline="") as f:
+        for record in csv.reader(f, delimiter="|"):
+            if record[DHC_SUMLEV] == DHC_BLOCK_SUMLEV and record[DHC_GEOCODE].startswith(county_geocode):
+                geocodes[record[DHC_LOGRECNO]] = record[DHC_GEOCODE]
+
+    rows = []
+    with segment_path.open(encoding="latin-1", newline="") as f:
+        for record in csv.reader(f, delimiter="|"):
+            geocode = geocodes.get(record[SEGMENT_LOGRECNO])
+            if geocode is None:
+                continue
+            p12 = [int(value) for value in record[P12_START:P12_START + P12_CELLS]]
+            # Total = male + female, and each is the sum of its age groups
+            if p12[0] != p12[1] + p12[25] or p12[1] != sum(p12[2:25]) or p12[25] != sum(p12[26:49]):
+                raise ValueError(f"Inconsistent P12 record for block {geocode}")
+            rows.append((geocode, sum(p12[cell - 1] for cell in P12_AGE_5_17)))
+
+    if len(rows) != len(geocodes):
+        raise ValueError(f"P12 records found for {len(rows)} of {len(geocodes)} blocks")
+    return pd.DataFrame(rows, columns=["GEOID20", "population_5_17"])
+
+
 def apportion_population(
     blocks: gpd.GeoDataFrame, population: pd.DataFrame, cities: gpd.GeoDataFrame
 ) -> gpd.GeoDataFrame:
     """Clip blocks to the study cities and apportion each block's population by area.
 
+    Every column of `population` other than GEOID20 is a count (total, aged 5-17).
     2020 blocks do not nest exactly in 2026 city boundaries, so a block split by a
     boundary contributes to each side in proportion to its area (assumes uniform
     density within the block).
     """
+    counts = [column for column in population.columns if column != "GEOID20"]
     blocks = blocks[["GEOID20", "geometry"]].merge(population, on="GEOID20", how="left", validate="1:1")
-    if blocks["population"].isna().any():
+    if blocks[counts].isna().any().any():
         raise ValueError("Census blocks without population records")
     blocks = blocks.to_crs(WORKING_CRS)
     blocks["block_area"] = blocks.area
 
     pieces = gpd.overlay(blocks, cities[["city", "geometry"]], how="intersection", keep_geom_type=True)
     pieces = pieces[pieces.area > 0]
-    pieces["population"] = pieces["population"] * pieces.area / pieces["block_area"]
+    for column in counts:
+        pieces[column] = pieces[column] * pieces.area / pieces["block_area"]
     # Simplify after apportioning, so the population values are exact
     pieces["geometry"] = pieces.simplify(POPULATION_SIMPLIFY_M, preserve_topology=True)
     pieces = pieces.rename(columns={"GEOID20": "geoid20"})
-    return pieces[["geoid20", "city", "population", "geometry"]].reset_index(drop=True)
+    return pieces[["geoid20", "city", *counts, "geometry"]].reset_index(drop=True)
 
 
 def main() -> None:
-    for path in (SCHOOLS_PATH, PLACES_PATH, BLOCKS_PATH, PL_GEO_PATH):
+    for path in (SCHOOLS_PATH, PLACES_PATH, BLOCKS_PATH, PL_GEO_PATH, DHC_GEO_PATH, DHC_P12_PATH):
         if not path.exists():
             raise FileNotFoundError(f"{path} — run scripts/download_data.py first")
 
@@ -160,15 +205,27 @@ def main() -> None:
     print("Schools in study cities:", len(study), "| context schools:", (~selected["in_study_area"]).sum())
     print("Not proximity eligible (Virtual = V):", (~selected["proximity_eligible"]).sum())
 
-    population = read_block_population(PL_GEO_PATH)
-    print("County blocks:", len(population), "| county population:", population["population"].sum())
-    units = apportion_population(gpd.read_file(BLOCKS_PATH), population, cities)
-    cities["population"] = (
-        cities["city"].map(units.groupby("city")["population"].sum()).fillna(0).round().astype(int)
+    population = read_block_population(PL_GEO_PATH).merge(
+        read_block_age_5_17(DHC_GEO_PATH, DHC_P12_PATH), on="GEOID20", how="outer", validate="1:1"
     )
-    print("Population in study cities:", cities["population"].sum())
+    if population.isna().any().any():
+        raise ValueError("P.L. 94-171 and DHC blocks do not match")
+    if (population["population_5_17"] > population["population"]).any():
+        raise ValueError("Population aged 5-17 exceeds total population")
+    print(
+        "County blocks:", len(population),
+        "| county population:", population["population"].sum(),
+        "| aged 5-17:", population["population_5_17"].sum(),
+    )
+    units = apportion_population(gpd.read_file(BLOCKS_PATH), population, cities)
+    for column in ("population", "population_5_17"):
+        totals = units.groupby("city")[column].sum()
+        cities[column] = cities["city"].map(totals).fillna(0).round().astype(int)
+    print("Population in study cities:", cities["population"].sum(), "| aged 5-17:", cities["population_5_17"].sum())
 
-    summary = cities.set_index("city")[["population"]].join(study.groupby("study_city").size().rename("schools"))
+    summary = cities.set_index("city")[["population", "population_5_17"]].join(
+        study.groupby("study_city").size().rename("schools")
+    )
     print(summary.sort_values("population", ascending=False).to_string())
 
     OUTPUT_PATH.parent.mkdir(parents=True, exist_ok=True)

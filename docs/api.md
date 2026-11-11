@@ -11,7 +11,8 @@ uvicorn app.main:app --app-dir backend --port 8010 --reload
 
 - Interactive docs (OpenAPI): http://localhost:8010/docs
 - Settings come from `.env`. `CORS_ORIGINS` lists the frontend origins allowed
-  to call the API (default `http://localhost:5174`, the Vite dev server).
+  to call the API (default `http://localhost:5174` and `http://127.0.0.1:5174`, the Vite dev
+  server; the browser treats the two host names as different origins).
 
 In the Docker stack the API is not published directly: nginx serves it at
 http://localhost:8080/api (docs at http://localhost:8080/api/docs).
@@ -25,8 +26,8 @@ All geometries are GeoJSON in **EPSG:4326**. Distances are computed in EPSG:2691
 | GET | `/health` | — | API, database and PostGIS version; 503 if the database is unreachable |
 | GET | `/facilities` | `city`, `facility_type`, `facility_subtype` (all optional) | FeatureCollection of facilities, including context facilities |
 | GET | `/facilities/{id}` | `id` ≥ 1 | Feature |
-| GET | `/cities` | — | FeatureCollection of the nine study places with type, area, 2020 population and facility count |
-| GET | `/analysis/proximity` | `radius_m` (100–2000, required), `city`, `facility_type`, `facility_subtype` | Coverage per place, by area and population |
+| GET | `/cities` | — | FeatureCollection of the nine study places with type, area, 2020 population (total and aged 5–17) and facility count |
+| GET | `/analysis/proximity` | `radius_m` (100–2000, required), `city`, `facility_type`, `facility_subtype` | Coverage per place, by area, population and population aged 5–17 |
 
 The API keeps the name `city` for a study place; Mentone is a CDP, not a city.
 
@@ -57,7 +58,8 @@ For each place: the part of its area within `radius_m` of **any**
 proximity-eligible facility (including facilities in neighbouring places and
 context facilities), clipped to the boundary and returned as `coverage`
 geometry; and the share of its 2020 residents in that area, apportioning each
-census block's population by the share of its area covered.
+census block's population by the share of its area covered. The same is
+computed for residents aged 5–17 (2020 DHC, table P12).
 
 ```json
 {
@@ -78,6 +80,9 @@ census block's population by the share of its area covered.
       "population": 54541,
       "covered_population": 32395,
       "covered_population_pct": 59.4,
+      "population_5_17": 9724,
+      "covered_population_5_17": 5987,
+      "covered_population_5_17_pct": 61.6,
       "coverage": { "type": "MultiPolygon", "coordinates": [] }
     }
   ]
@@ -94,8 +99,11 @@ census block's population by the share of its area covered.
   **distinct** ids rather than summing `contributing_facilities` (e.g. Colton
   and Rialto at 1 km: 62 distinct schools, 67 if summed). Population and area
   can be summed directly to get weighted percentages.
+- `population_5_17`, `covered_population_5_17`, `covered_population_5_17_pct`:
+  the same for residents aged 5–17. `null` only if the database was loaded
+  before migration `003`; `/cities` has `population_5_17` too.
 - A `facility_type` with no facilities returns zeros and `coverage: null`.
-- All nine places take 0.6–0.8 s; pass `city` for a single place.
+- All nine places take 0.4–0.7 s; pass `city` for a single place.
 
 ## Errors
 
@@ -114,5 +122,6 @@ python -m pytest backend/tests
 ```
 
 They check record counts, boundary-based assignment, WGS84 coordinates,
-filters, error codes, and that area and population coverage match the values
+filters, error codes, and that area and population coverage (total and aged
+5–17) match the values
 verified independently with GeoPandas.

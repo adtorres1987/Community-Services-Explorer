@@ -6,8 +6,9 @@ import { FilterPanel } from './FilterPanel'
 
 const places = [makePlace('Colton'), makePlace('Mentone', { place_type: 'CDP' }), makePlace('Rialto')]
 
-function renderPanel(cities: string[]) {
+function renderPanel(cities: string[], ageDataAvailable = true) {
   const onCitiesChange = vi.fn()
+  const onPopulationGroupChange = vi.fn()
   render(
     <FilterPanel
       places={places}
@@ -15,12 +16,15 @@ function renderPanel(cities: string[]) {
       cities={cities}
       subtype={null}
       radius={null}
+      populationGroup="all"
+      ageDataAvailable={ageDataAvailable}
       onCitiesChange={onCitiesChange}
       onSubtypeChange={vi.fn()}
       onRadiusChange={vi.fn()}
+      onPopulationGroupChange={onPopulationGroupChange}
     />,
   )
-  return onCitiesChange
+  return Object.assign(onCitiesChange, { onPopulationGroupChange })
 }
 
 describe('FilterPanel communities', () => {
@@ -60,5 +64,20 @@ describe('FilterPanel communities', () => {
   it('disables "None" when nothing is selected', () => {
     renderPanel([])
     expect(screen.getByRole('button', { name: 'None' })).toBeDisabled()
+  })
+})
+
+describe('FilterPanel population', () => {
+  it('switches between all residents and ages 5–17', async () => {
+    const { onPopulationGroupChange } = renderPanel([])
+    expect(screen.getByRole('radio', { name: 'All residents' })).toBeChecked()
+    await userEvent.click(screen.getByRole('radio', { name: 'Ages 5–17' }))
+    expect(onPopulationGroupChange).toHaveBeenCalledWith('age_5_17')
+  })
+
+  it('disables ages 5–17 when the database has no age data', () => {
+    renderPanel([], false)
+    expect(screen.getByRole('radio', { name: 'Ages 5–17' })).toBeDisabled()
+    expect(screen.getByText(/apply migration 003/)).toBeInTheDocument()
   })
 })

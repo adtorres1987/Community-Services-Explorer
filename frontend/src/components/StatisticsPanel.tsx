@@ -1,6 +1,13 @@
 import type { CityProperties, FacilityCollection, ProximityResponse } from '../services/api'
 import type { RequestState } from '../services/useRequest'
-import { percent, summarizeCoverage } from '../features/facilities/coverage'
+import {
+  percent,
+  placePopulation,
+  POPULATION_GROUPS,
+  resultPopulation,
+  summarizeCoverage,
+  type PopulationGroup,
+} from '../features/facilities/coverage'
 import { isSelected } from '../features/facilities/schools'
 
 interface Props {
@@ -8,6 +15,7 @@ interface Props {
   /** Selected places; empty means all */
   selectedCities: string[]
   subtype: string | null
+  populationGroup: PopulationGroup
   // Study-area facilities matching the type filter
   facilities: FacilityCollection['features']
   radius: number | null
@@ -24,19 +32,21 @@ export function StatisticsPanel({
   places,
   selectedCities,
   subtype,
+  populationGroup,
   facilities,
   radius,
   proximity,
 }: Props) {
+  const group = POPULATION_GROUPS[populationGroup]
   const shown = places.filter((p) => isSelected(p.name, selectedCities))
   const isPartial = shown.length < places.length
   const shownNames = new Set(shown.map((p) => p.name))
   const results = (proximity.data?.results ?? []).filter((r) => shownNames.has(r.city))
-  const summary = summarizeCoverage(results)
+  const summary = summarizeCoverage(results, populationGroup)
   const showCoverage = radius !== null
   const schoolsIn = (name: string) => facilities.filter((f) => f.properties.city === name).length
   const totalSchools = shown.reduce((sum, p) => sum + schoolsIn(p.name), 0)
-  const totalPopulation = shown.reduce((sum, p) => sum + p.population, 0)
+  const totalPopulation = shown.reduce((sum, p) => sum + placePopulation(p, populationGroup), 0)
   const totalLabel = isPartial ? `Selected (${shown.length})` : `All (${shown.length})`
   const outside = summary.contributing - summary.eligible
 
@@ -55,17 +65,20 @@ export function StatisticsPanel({
             <th scope="col">Schools</th>
             {showCoverage ? (
               <>
-                <th scope="col">Residents within {formatRadius(radius)}</th>
+                <th scope="col">
+                  {group.column} within {formatRadius(radius)}
+                </th>
                 <th scope="col">Area within {formatRadius(radius)}</th>
               </>
             ) : (
-              <th scope="col">Population (2020)</th>
+              <th scope="col">{populationGroup === 'all' ? 'Population' : group.column} (2020)</th>
             )}
           </tr>
         </thead>
         <tbody>
           {shown.map((place) => {
             const result = results.find((r) => r.city === place.name)
+            const pct = result && resultPopulation(result, populationGroup).pct
             return (
               <tr key={place.name}>
                 <th scope="row">
@@ -75,11 +88,11 @@ export function StatisticsPanel({
                 <td>{schoolsIn(place.name)}</td>
                 {showCoverage ? (
                   <>
-                    <td>{result ? `${result.covered_population_pct.toFixed(1)}%` : '—'}</td>
+                    <td>{pct != null ? `${pct.toFixed(1)}%` : '—'}</td>
                     <td>{result ? `${result.covered_pct.toFixed(1)}%` : '—'}</td>
                   </>
                 ) : (
-                  <td>{number.format(place.population)}</td>
+                  <td>{number.format(placePopulation(place, populationGroup))}</td>
                 )}
               </tr>
             )
@@ -119,7 +132,7 @@ export function StatisticsPanel({
             {shown.length === 1 ? shown[0].name : isPartial ? `${shown.length} selected communities` : 'All communities'}
             :
           </strong>{' '}
-          {number.format(summary.coveredPopulation)} of {number.format(summary.population)} residents
+          {number.format(summary.coveredPopulation)} of {number.format(summary.population)} {group.noun}{' '}
           ({percent(summary.coveredPopulation, summary.population)}) and{' '}
           {summary.coveredAreaKm2.toFixed(2)} of {summary.areaKm2.toFixed(2)} km² are within{' '}
           {formatRadius(radius)} of a school. {summary.contributing} school
@@ -136,8 +149,10 @@ export function StatisticsPanel({
       <p className="caveat">
         Schools are assigned to the community whose boundary contains them. Proximity is
         straight-line distance, not travel by street. Residents are 2020 census block counts,
-        apportioned by area. Totals are weighted by population and area. Nothing here measures
-        capacity, quality or enrolment boundaries.
+        apportioned by area; ages 5–17 come from the 2020 DHC (table P12), whose block counts
+        carry disclosure-avoidance noise that largely averages out over a community. Totals are
+        weighted by population and area. Nothing here measures capacity, quality or enrolment
+        boundaries.
       </p>
     </section>
   )

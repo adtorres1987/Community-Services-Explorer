@@ -2,14 +2,15 @@ import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import type { ProximityResponse } from '../services/api'
+import type { PopulationGroup } from '../features/facilities/coverage'
 import type { RequestState } from '../services/useRequest'
 import { makeFacility, makePlace, makeResult } from '../test/fixtures'
 import { StatisticsPanel } from './StatisticsPanel'
 
 const places = [
-  makePlace('Loma Linda', { population: 24939 }),
-  makePlace('Mentone', { place_type: 'CDP', population: 9557 }),
-  makePlace('Redlands', { population: 73161 }),
+  makePlace('Loma Linda', { population: 24939, population_5_17: 3550 }),
+  makePlace('Mentone', { place_type: 'CDP', population: 9557, population_5_17: 1712 }),
+  makePlace('Redlands', { population: 73161, population_5_17: 12118 }),
 ]
 
 const facilities = [
@@ -40,6 +41,9 @@ const proximity: ProximityResponse = {
       population: 24939,
       covered_population: 7160,
       covered_population_pct: 28.7,
+      population_5_17: 3550,
+      covered_population_5_17: 1062,
+      covered_population_5_17_pct: 29.9,
     }),
     makeResult({
       city: 'Mentone',
@@ -52,6 +56,9 @@ const proximity: ProximityResponse = {
       population: 9557,
       covered_population: 6589,
       covered_population_pct: 68.9,
+      population_5_17: 1712,
+      covered_population_5_17: 1218,
+      covered_population_5_17_pct: 71.2,
     }),
     makeResult({
       city: 'Redlands',
@@ -65,16 +72,25 @@ const proximity: ProximityResponse = {
       population: 73161,
       covered_population: 54741,
       covered_population_pct: 74.8,
+      population_5_17: 12118,
+      covered_population_5_17: 9261,
+      covered_population_5_17_pct: 76.4,
     }),
   ],
 }
 
-function renderPanel(selectedCities: string[], radius: number | null, state = idle({ data: proximity })) {
+function renderPanel(
+  selectedCities: string[],
+  radius: number | null,
+  state = idle({ data: proximity }),
+  populationGroup: PopulationGroup = 'all',
+) {
   render(
     <StatisticsPanel
       places={places}
       selectedCities={selectedCities}
       subtype={null}
+      populationGroup={populationGroup}
       facilities={facilities}
       radius={radius}
       proximity={state}
@@ -135,6 +151,24 @@ describe('StatisticsPanel', () => {
     renderPanel(['Loma Linda', 'Mentone', 'Redlands'], 1000)
     expect(rowNames().at(-1)).toBe('All (3)')
     expect(detail()).toMatch(/^All communities: .*including \d+ outside the study area/)
+  })
+
+  it('counts residents aged 5–17 when that population is selected', () => {
+    renderPanel(['Mentone', 'Redlands'], 1000, idle({ data: proximity }), 'age_5_17')
+    expect(screen.getByRole('columnheader', { name: 'Ages 5–17 within 1 km' })).toBeInTheDocument()
+    expect(cells(/^Redlands/)).toEqual(['2', '76.4%', '39.6%'])
+    // (1,218 + 9,261) / (1,712 + 12,118); area is unchanged
+    expect(cells(/^Selected \(2\)/)).toEqual(['3', '75.8%', '38.2%'])
+    expect(detail()).toMatch(
+      /^2 selected communities: 10,479 of 13,830 residents aged 5–17 \(75\.8%\) and 41\.94 of 109\.71 km²/,
+    )
+  })
+
+  it('lists the population aged 5–17 without a radius', () => {
+    renderPanel([], null, idle({ data: proximity }), 'age_5_17')
+    expect(screen.getByRole('columnheader', { name: 'Ages 5–17 (2020)' })).toBeInTheDocument()
+    expect(cells(/^Redlands/)).toEqual(['2', '12,118'])
+    expect(cells(/^All \(3\)/)).toEqual(['4', '17,380'])
   })
 
   it('reports analysis errors with a retry button', async () => {

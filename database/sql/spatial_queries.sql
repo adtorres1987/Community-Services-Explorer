@@ -83,11 +83,12 @@ FROM city_boundaries b
 CROSS JOIN (VALUES (500), (1000)) AS r(radius_m)
 ORDER BY b.name, r.radius_m;
 
-\echo '7b. Population: share of residents within 1 km (block population apportioned by area)'
+\echo '7b. Population: share of residents, and of residents aged 5-17, within 1 km (block population apportioned by area)'
 WITH coverage AS (
     SELECT
         b.name,
         b.population,
+        b.population_5_17,
         ST_Intersection(
             b.geom,
             (SELECT ST_Union(ST_Buffer(f.geom, 1000))
@@ -101,10 +102,13 @@ SELECT
     c.population,
     round(sum(u.population * ST_Area(ST_Intersection(u.geom, c.geom)) / ST_Area(u.geom))) AS covered,
     round((100 * sum(u.population * ST_Area(ST_Intersection(u.geom, c.geom)) / ST_Area(u.geom))
-        / c.population)::numeric, 1) AS pct_population_within_1km
+        / c.population)::numeric, 1) AS pct_population_within_1km,
+    c.population_5_17,
+    round((100 * sum(u.population_5_17 * ST_Area(ST_Intersection(u.geom, c.geom)) / ST_Area(u.geom))
+        / c.population_5_17)::numeric, 1) AS pct_age_5_17_within_1km
 FROM coverage c
 JOIN population_units u ON u.city = c.name AND ST_Intersects(u.geom, c.geom)
-GROUP BY c.name, c.population
+GROUP BY c.name, c.population, c.population_5_17
 ORDER BY c.name;
 
 \echo '8. ST_Transform: GeoJSON output in EPSG:4326 (as the API will return it)'
