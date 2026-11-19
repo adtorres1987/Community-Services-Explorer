@@ -8,9 +8,11 @@ import {
   summarizeCoverage,
   type PopulationGroup,
 } from '../features/facilities/coverage'
-import { isSelected } from '../features/facilities/schools'
+import { isSelected } from '../features/facilities/filters'
+import { radiusOption, type ServiceConfig } from '../features/facilities/services'
 
 interface Props {
+  service: ServiceConfig
   places: CityProperties[]
   /** Selected places; empty means all */
   selectedCities: string[]
@@ -22,13 +24,10 @@ interface Props {
   proximity: RequestState<ProximityResponse>
 }
 
-function formatRadius(radius: number) {
-  return radius >= 1000 ? `${radius / 1000} km` : `${radius} m`
-}
-
 const number = new Intl.NumberFormat('en-US')
 
 export function StatisticsPanel({
+  service,
   places,
   selectedCities,
   subtype,
@@ -44,8 +43,9 @@ export function StatisticsPanel({
   const results = (proximity.data?.results ?? []).filter((r) => shownNames.has(r.city))
   const summary = summarizeCoverage(results, populationGroup)
   const showCoverage = radius !== null
-  const schoolsIn = (name: string) => facilities.filter((f) => f.properties.city === name).length
-  const totalSchools = shown.reduce((sum, p) => sum + schoolsIn(p.name), 0)
+  const option = radius === null ? null : radiusOption(service, radius)
+  const countIn = (name: string) => facilities.filter((f) => f.properties.city === name).length
+  const totalCount = shown.reduce((sum, p) => sum + countIn(p.name), 0)
   const totalPopulation = shown.reduce((sum, p) => sum + placePopulation(p, populationGroup), 0)
   const totalLabel = isPartial ? `Selected (${shown.length})` : `All (${shown.length})`
   const outside = summary.contributing - summary.eligible
@@ -56,19 +56,21 @@ export function StatisticsPanel({
         Statistics
         {proximity.loading && <span className="muted"> · calculating…</span>}
       </h2>
-      <p className="muted">{subtype ? `${subtype} schools` : 'All school types'}</p>
+      <p className="muted">
+        {subtype ? `${subtype} ${service.plural}` : service.allSubtypes}
+      </p>
 
       <table className="stats-table">
         <thead>
           <tr>
             <th scope="col">Community</th>
-            <th scope="col">Schools</th>
-            {showCoverage ? (
+            <th scope="col">{service.label}</th>
+            {option ? (
               <>
                 <th scope="col">
-                  {group.column} within {formatRadius(radius)}
+                  {group.column} within {option.label}
                 </th>
-                <th scope="col">Area within {formatRadius(radius)}</th>
+                <th scope="col">Area within {option.label}</th>
               </>
             ) : (
               <th scope="col">{populationGroup === 'all' ? 'Population' : group.column} (2020)</th>
@@ -85,7 +87,7 @@ export function StatisticsPanel({
                   {place.name}
                   {place.place_type === 'CDP' && <span className="tag">CDP</span>}
                 </th>
-                <td>{schoolsIn(place.name)}</td>
+                <td>{countIn(place.name)}</td>
                 {showCoverage ? (
                   <>
                     <td>{pct != null ? `${pct.toFixed(1)}%` : '—'}</td>
@@ -103,7 +105,7 @@ export function StatisticsPanel({
           <tfoot>
             <tr>
               <th scope="row">{totalLabel}</th>
-              <td>{totalSchools}</td>
+              <td>{totalCount}</td>
               {showCoverage ? (
                 <>
                   <td>{results.length ? percent(summary.coveredPopulation, summary.population) : '—'}</td>
@@ -126,7 +128,7 @@ export function StatisticsPanel({
         </p>
       )}
 
-      {showCoverage && results.length > 0 && (
+      {option && results.length > 0 && (
         <p className="stats-detail">
           <strong>
             {shown.length === 1 ? shown[0].name : isPartial ? `${shown.length} selected communities` : 'All communities'}
@@ -135,24 +137,26 @@ export function StatisticsPanel({
           {number.format(summary.coveredPopulation)} of {number.format(summary.population)} {group.noun}{' '}
           ({percent(summary.coveredPopulation, summary.population)}) and{' '}
           {summary.coveredAreaKm2.toFixed(2)} of {summary.areaKm2.toFixed(2)} km² are within{' '}
-          {formatRadius(radius)} of a school. {summary.contributing} school
-          {summary.contributing === 1 ? '' : 's'} contribute
+          {option.long} of a {service.singular}. {summary.contributing}{' '}
+          {summary.contributing === 1 ? service.singular : service.plural} contribute
           {summary.contributing === 1 ? 's' : ''}
           {outside > 0 &&
             `, including ${outside} outside ${
               shown.length === 1 ? shown[0].name : isPartial ? 'the selection' : 'the study area'
             }`}
-          {summary.excluded > 0 && `; ${summary.excluded} exclusively virtual excluded`}.
+          {summary.excluded > 0 &&
+            service.excluded &&
+            `; ${summary.excluded} ${service.excluded.summary}`}
+          .
         </p>
       )}
 
       <p className="caveat">
-        Schools are assigned to the community whose boundary contains them. Proximity is
-        straight-line distance, not travel by street. Residents are 2020 census block counts,
+        {service.caveat} Proximity is straight-line distance, not travel by street. Residents are 2020 census block counts,
         apportioned by area; ages 5–17 come from the 2020 DHC (table P12), whose block counts
         carry disclosure-avoidance noise that largely averages out over a community. Totals are
-        weighted by population and area. Nothing here measures capacity, quality or enrolment
-        boundaries.
+        weighted by population and area. Nothing here measures capacity, opening hours, quality
+        or service boundaries.
       </p>
     </section>
   )

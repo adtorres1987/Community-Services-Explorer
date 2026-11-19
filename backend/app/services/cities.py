@@ -14,6 +14,15 @@ def list_cities(conn: Connection) -> CityCollection:
             b.population_5_17,
             ST_Area(b.geom) / 1e6 AS area_km2,
             (SELECT count(*) FROM facilities f WHERE f.city = b.name) AS facility_count,
+            (
+                SELECT coalesce(jsonb_object_agg(t.facility_type, t.n), '{}')
+                FROM (
+                    SELECT facility_type, count(*) AS n
+                    FROM facilities f
+                    WHERE f.city = b.name
+                    GROUP BY facility_type
+                ) t
+            ) AS facility_counts,
             ST_AsGeoJSON(ST_Transform(b.geom, 4326), 6)::json AS geometry
         FROM city_boundaries b
         ORDER BY b.name
@@ -32,6 +41,7 @@ def list_cities(conn: Connection) -> CityCollection:
                     population=row["population"],
                     population_5_17=row["population_5_17"],
                     facility_count=row["facility_count"],
+                    facility_counts=row["facility_counts"],
                 ),
             )
             for row in rows

@@ -142,6 +142,30 @@ legal survey boundaries. CDP boundaries are statistical, not administrative.
   analysis does (thousands of blocks per community). Totals by block are
   not affected beyond what P.L. 94-171 already includes.
 
+## Public Libraries Survey FY 2024 — library outlets
+
+| Item | Value |
+|---|---|
+| Publisher | Institute of Museum and Library Services (IMLS) |
+| Page | https://www.imls.gov/research-evaluation/surveys/public-libraries-survey-pls |
+| Download URL (CSV) | https://www.imls.gov/sites/default/files/2026-06/pls_fy2024_csv.zip |
+| SHA-256 (zip) | `73910b723f23d5ab6a45d472195621d5733a26c79e089494ae1e45f908bbbb8c` (20,133,862 bytes) |
+| Documentation | FY 2024 Data Documentation and User's Guide (imls.gov, June 2026) |
+| Rights | Public domain (U.S. Government work; public-use data files) |
+| Downloaded | 2026-11-18 |
+| Local files | `data/raw/pls_fy2024/` (not committed) |
+
+- Two files are used: the **outlet file** (`pls_fy24_outlet_pud24i.csv`,
+  17,615 outlets with geocoded `LATITUDE`/`LONGITUD`, WGS84) and the **system
+  file** (`PLS_FY24_AE_pud24i.csv`, administrative entities), joined on
+  `FSCSKEY` for the library system name.
+- Fiscal year 2024 data, published in June 2026: openings, closures or moves
+  since then are not reflected.
+- **County law libraries are not public libraries.** California reports its 35
+  county law libraries to the survey with `C_FSCS = N` (they do not meet the
+  FSCS public library definition), e.g. the Law Library for San Bernardino
+  County in downtown San Bernardino. They are excluded.
+
 ## Processing (`scripts/prepare_study_area.py`)
 
 Writes `data/processed/study_area.gpkg` (EPSG:26911), committed to the repository.
@@ -158,13 +182,26 @@ Writes `data/processed/study_area.gpkg` (EPSG:26911), committed to the repositor
    (`in_study_area = false`, `study_city` empty).
 4. `proximity_eligible = false` for exclusively virtual schools (`Virtual = 'V'`).
 
+**Libraries**
+
+5. Keep California outlets with `C_FSCS = 'Y'` (public library systems; excludes
+   the county law libraries), outlet type `CE` (central) or `BR` (branch;
+   bookmobiles `BS` and books-by-mail `BM` have no fixed location), and not
+   temporarily closed (`STATSTRU <> '23'`).
+6. Assign by boundary like schools, and keep **context libraries** within
+   3.2 km (2 miles, the largest radius offered for libraries) of the study area.
+   All libraries are proximity eligible.
+7. Upper-case PLS text is converted for display ("656 N. 9TH ST." →
+   "656 N. 9th St."); negative PLS codes for missing numbers (−1, −3, −9)
+   become empty.
+
 **Population**
 
-5. Clip 2020 blocks to the study places. A block split by a boundary gets
+8. Clip 2020 blocks to the study places. A block split by a boundary gets
    population in proportion to the area on each side (2020 blocks do not nest
    exactly in 2026 boundaries; 344 blocks are split).
-6. Ages 5–17 (DHC) are apportioned the same way, block by block.
-7. Simplify the clipped blocks with a 1 m tolerance *after* computing
+9. Ages 5–17 (DHC) are apportioned the same way, block by block.
+10. Simplify the clipped blocks with a 1 m tolerance *after* computing
    population, to keep the committed file small (~0.003 % area change).
 
 **Working CRS:** EPSG:26911 (NAD83 / UTM zone 11N, metres). EPSG:3857 is not
@@ -175,21 +212,30 @@ suitable for distance measurement (≈0.83 true metres per unit at 34°N).
 | Layer | Features | Notes |
 |---|---|---|
 | `schools` | 205 | 173 in the study area + 32 context; 7 not proximity eligible |
+| `libraries` | 20 | 14 in the study area + 6 context |
 | `city_boundaries` | 9 | With 2020 `population` and `population_5_17` |
 | `population_units` | 6,839 | 6,487 blocks clipped to places, apportioned `population` and `population_5_17` |
 
-| Place | Schools | Population (2020) | Ages 5–17 (2020) |
-|---|---|---|---|
-| Colton | 15 | 53,915 | 10,689 |
-| Grand Terrace | 4 | 13,148 | 2,129 |
-| Highland | 10 | 56,969 | 11,893 |
-| Loma Linda | 2 | 24,939 | 3,550 |
-| Mentone | 2 | 9,557 | 1,712 |
-| Redlands | 22 | 73,161 | 12,118 |
-| Rialto | 28 | 104,063 | 21,785 |
-| San Bernardino | 77 | 222,042 | 46,869 |
-| Yucaipa | 13 | 54,541 | 9,724 |
-| **Total** | **173** | **612,335** | **120,469** |
+| Place | Schools | Libraries | Population (2020) | Ages 5–17 (2020) |
+|---|---|---|---|---|
+| Colton | 15 | 2 | 53,915 | 10,689 |
+| Grand Terrace | 4 | 1 | 13,148 | 2,129 |
+| Highland | 10 | 1 | 56,969 | 11,893 |
+| Loma Linda | 2 | 1 | 24,939 | 3,550 |
+| Mentone | 2 | 1 | 9,557 | 1,712 |
+| Redlands | 22 | 1 | 73,161 | 12,118 |
+| Rialto | 28 | 2 | 104,063 | 21,785 |
+| San Bernardino | 77 | 4 | 222,042 | 46,869 |
+| Yucaipa | 13 | 1 | 54,541 | 9,724 |
+| **Total** | **173** | **14** | **612,335** | **120,469** |
+
+Libraries by system: San Bernardino County Library 8 (Grand Terrace,
+Highland, Loma Linda, Mentone, Rialto 2, Yucaipa), San Bernardino Public
+Library 4 (central Norman F. Feldheym and 3 branches), Colton Public Library 2
+(central and Luque branch), A. K. Smiley Public Library 1 (Redlands, central).
+Context libraries: Fontana Lewis, Summit (Fontana), Bloomington and Muscoy
+(San Bernardino County Library), Highgrove and Calimesa (Riverside County
+Library System).
 
 Context schools by address city: Fontana 16, San Bernardino (unincorporated) 8,
 Bloomington 5, Riverside 2, Calimesa 1 (29 in San Bernardino County, 3 in
@@ -208,7 +254,10 @@ Riverside County). `tests/test_processed_data.py` checks these values.
 - **Co-located records.** Some schools share a site (distance 0–4 m): Del
   Vallejo Middle / Alternative Learning Center, Entrepreneur High / New Vision
   Middle, the two Gorman Learning Center records. Counts are of records.
-- **Population is from 2020**, boundaries from 2026 and schools from 2025–26.
+- **Library names are truncated in the source** at 60 characters: "Highland Sam
+  J. Racadio Library and Environmental Learning C[enter]".
+- **Population is from 2020**, boundaries from 2026, schools from 2025–26 and
+  libraries from fiscal year 2024.
 
 ## Earlier scope (Redlands and Yucaipa)
 

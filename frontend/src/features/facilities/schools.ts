@@ -28,11 +28,11 @@ const VIRTUAL_LABELS: Record<string, string> = {
   V: 'Exclusively virtual',
 }
 
-export function virtualLabel(code: string | null): string {
+export function virtualLabel(code: string | null | undefined): string {
   return (code && VIRTUAL_LABELS[code]) ?? 'Unknown'
 }
 
-function gradeLabel(grade: string | null): string | null {
+function gradeLabel(grade: string | null | undefined): string | null {
   if (!grade) return null
   return /^\d+$/.test(grade) ? String(Number(grade)) : grade
 }
@@ -42,32 +42,4 @@ export function gradeRange(properties: FacilityProperties): string | null {
   const high = gradeLabel(properties.attributes.GradeHigh)
   if (!low || !high) return null
   return low === high ? low : `${low}–${high}`
-}
-
-export interface FacilityFilters {
-  /** Selected places; empty means all places */
-  cities: string[]
-  subtype: string | null
-}
-
-/** True when the place is part of the selection (an empty selection includes every place). */
-export function isSelected(city: string | null, cities: string[]): boolean {
-  return cities.length === 0 || (city !== null && cities.includes(city))
-}
-
-/** Schools of other types are hidden: the coverage only uses the selected type. */
-export function matchesSubtype(properties: FacilityProperties, subtype: string | null): boolean {
-  return subtype === null || properties.facility_subtype === subtype
-}
-
-/**
- * Schools drawn at full strength: in the study area and in a selected place.
- * The rest stay on the map, faded, because they still add to the coverage.
- */
-export function isInFocus(properties: FacilityProperties, filters: FacilityFilters): boolean {
-  return (
-    properties.in_study_area &&
-    isSelected(properties.city, filters.cities) &&
-    matchesSubtype(properties, filters.subtype)
-  )
 }

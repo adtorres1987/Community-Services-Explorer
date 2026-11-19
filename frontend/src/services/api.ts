@@ -18,6 +18,19 @@ export interface SchoolAttributes {
   EnrollTotal: number | null
 }
 
+export interface LibraryAttributes {
+  LibrarySystem: string | null
+  Address: string | null
+  Zip: string | null
+  Phone: string | null
+  SquareFeet: number | null
+  AnnualHours: number | null
+  WeeksOpen: number | null
+}
+
+/** Source-specific fields; which ones are present depends on facility_type */
+export type FacilityAttributes = Partial<SchoolAttributes> & Partial<LibraryAttributes>
+
 export interface FacilityProperties {
   id: number
   name: string
@@ -30,7 +43,7 @@ export interface FacilityProperties {
   /** False: nearby facility that only contributes to proximity coverage */
   in_study_area: boolean
   proximity_eligible: boolean
-  attributes: SchoolAttributes
+  attributes: FacilityAttributes
 }
 
 export type FacilityCollection = FeatureCollection<Point, FacilityProperties>
@@ -45,6 +58,8 @@ export interface CityProperties {
   /** Aged 5–17 (2020 DHC); null if the database predates migration 003 */
   population_5_17: number | null
   facility_count: number
+  /** By facility_type, e.g. { school: 22, library: 1 } */
+  facility_counts: Record<string, number>
 }
 
 export type CityCollection = FeatureCollection<MultiPolygon, CityProperties>
@@ -120,18 +135,20 @@ export function fetchCities(signal: AbortSignal) {
   return getJson<CityCollection>('/cities', {}, signal)
 }
 
+/** Every facility of every type (~225); the app filters by service in the browser */
 export function fetchFacilities(signal: AbortSignal) {
-  return getJson<FacilityCollection>('/facilities', { facility_type: 'school' }, signal)
+  return getJson<FacilityCollection>('/facilities', {}, signal)
 }
 
 export function fetchProximity(
   radiusM: number,
+  facilityType: string,
   facilitySubtype: string | null,
   signal: AbortSignal,
 ) {
   return getJson<ProximityResponse>(
     '/analysis/proximity',
-    { radius_m: radiusM, facility_type: 'school', facility_subtype: facilitySubtype },
+    { radius_m: radiusM, facility_type: facilityType, facility_subtype: facilitySubtype },
     signal,
   )
 }

@@ -20,7 +20,7 @@ SELECT
     count(f.id) AS schools_inside,
     count(f.id) FILTER (WHERE f.city = b.name) AS assigned_to_place
 FROM city_boundaries b
-LEFT JOIN facilities f ON ST_Intersects(f.geom, b.geom)
+LEFT JOIN facilities f ON f.facility_type = 'school' AND ST_Intersects(f.geom, b.geom)
 GROUP BY b.name
 ORDER BY b.name;
 
@@ -31,7 +31,7 @@ SELECT
     round(min(ST_Distance(f.geom, b.geom))) AS distance_to_study_area_m
 FROM facilities f
 CROSS JOIN city_boundaries b
-WHERE NOT f.in_study_area
+WHERE f.facility_type = 'school' AND NOT f.in_study_area
 GROUP BY f.id, f.name, f.address_city
 ORDER BY distance_to_study_area_m
 LIMIT 10;
@@ -49,11 +49,11 @@ FROM facilities f
 CROSS JOIN LATERAL (
     SELECT o.name, o.geom
     FROM facilities o
-    WHERE o.id <> f.id AND o.proximity_eligible
+    WHERE o.id <> f.id AND o.proximity_eligible AND o.facility_type = 'school'
     ORDER BY o.geom <-> f.geom
     LIMIT 1
 ) AS nearest
-WHERE f.proximity_eligible
+WHERE f.proximity_eligible AND f.facility_type = 'school'
 ORDER BY utm_m
 LIMIT 5;
 
@@ -64,6 +64,7 @@ WITH origin AS (
 SELECT f.name, round(ST_Distance(f.geom, origin.geom)) AS distance_m
 FROM facilities f, origin
 WHERE f.proximity_eligible
+  AND f.facility_type = 'school'
   AND ST_DWithin(f.geom, origin.geom, 1000)
 ORDER BY distance_m;
 
@@ -77,7 +78,8 @@ SELECT
         b.geom,
         (SELECT ST_Union(ST_Buffer(f.geom, r.radius_m))
          FROM facilities f
-         WHERE f.proximity_eligible AND ST_DWithin(f.geom, b.geom, r.radius_m))
+         WHERE f.facility_type = 'school' AND f.proximity_eligible
+           AND ST_DWithin(f.geom, b.geom, r.radius_m))
     )) / ST_Area(b.geom))::numeric, 1) AS pct_area_within_radius
 FROM city_boundaries b
 CROSS JOIN (VALUES (500), (1000)) AS r(radius_m)
@@ -93,7 +95,8 @@ WITH coverage AS (
             b.geom,
             (SELECT ST_Union(ST_Buffer(f.geom, 1000))
              FROM facilities f
-             WHERE f.proximity_eligible AND ST_DWithin(f.geom, b.geom, 1000))
+             WHERE f.facility_type = 'school' AND f.proximity_eligible
+               AND ST_DWithin(f.geom, b.geom, 1000))
         ) AS geom
     FROM city_boundaries b
 )
@@ -110,6 +113,33 @@ FROM coverage c
 JOIN population_units u ON u.city = c.name AND ST_Intersects(u.geom, c.geom)
 GROUP BY c.name, c.population, c.population_5_17
 ORDER BY c.name;
+
+\echo '7c. Libraries: share of residents within 1/2, 1 and 2 miles (800 m, 1.6 km, 3.2 km) of a public library'
+-- Context libraries up to 3.2 km outside the study area count too
+WITH coverage AS (
+    SELECT
+        b.name,
+        b.population,
+        r.radius_m,
+        ST_Intersection(
+            b.geom,
+            (SELECT ST_Union(ST_Buffer(f.geom, r.radius_m))
+             FROM facilities f
+             WHERE f.facility_type = 'library' AND f.proximity_eligible
+               AND ST_DWithin(f.geom, b.geom, r.radius_m))
+        ) AS geom
+    FROM city_boundaries b
+    CROSS JOIN (VALUES (800), (1600), (3200)) AS r(radius_m)
+)
+SELECT
+    c.name AS place,
+    c.radius_m,
+    round((100 * coalesce(sum(u.population * ST_Area(ST_Intersection(u.geom, c.geom)) / ST_Area(u.geom)), 0)
+        / c.population)::numeric, 1) AS pct_population_within_radius
+FROM coverage c
+LEFT JOIN population_units u ON u.city = c.name AND ST_Intersects(u.geom, c.geom)
+GROUP BY c.name, c.population, c.radius_m
+ORDER BY c.name, c.radius_m;
 
 \echo '8. ST_Transform: GeoJSON output in EPSG:4326 (as the API will return it)'
 SELECT name, ST_AsGeoJSON(ST_Transform(geom, 4326), 6) AS geojson

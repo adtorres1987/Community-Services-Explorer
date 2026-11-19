@@ -33,21 +33,21 @@ one-shot `loader` service.
 All geometries use **SRID 26911** (NAD83 / UTM zone 11N, metres). The API
 transforms to EPSG:4326 for GeoJSON output.
 
-**`facilities`** — one row per facility, generic across future service types.
+**`facilities`** — one row per facility, generic across service types (schools and libraries).
 
 | Column | Type | Notes |
 |---|---|---|
 | `id` | `BIGINT` identity | Internal id |
-| `source_id` | `TEXT` | `CDSCode` for schools; unique with `source_name` |
-| `source_name` | `TEXT` | `cde_public_schools_2025_26` |
+| `source_id` | `TEXT` | `CDSCode` for schools, `FSCSKEY-FSCS_SEQ` for libraries; unique with `source_name` |
+| `source_name` | `TEXT` | `cde_public_schools_2025_26` or `imls_pls_fy2024_outlets` |
 | `name` | `TEXT` | |
-| `facility_type` | `TEXT` | `school` |
-| `facility_subtype` | `TEXT` | CDE `SchoolType` (Elementary, High, …) |
+| `facility_type` | `TEXT` | `school` or `library` |
+| `facility_subtype` | `TEXT` | CDE `SchoolType` (Elementary, High, …); `Central` or `Branch` for libraries |
 | `city` | `TEXT` | Study place whose boundary contains the facility; `NULL` for context facilities |
 | `address_city` | `TEXT` | Mailing-address city from the source |
-| `in_study_area` | `BOOLEAN` | `false` for context facilities (within 2 km, coverage only); `CHECK (in_study_area = (city IS NOT NULL))` |
-| `proximity_eligible` | `BOOLEAN` | `false` for exclusively virtual schools |
-| `attributes` | `JSONB` | Source-specific fields (level, grades, charter, district, address, county, website, enrolment) |
+| `in_study_area` | `BOOLEAN` | `false` for context facilities (within 2 km for schools, 3.2 km for libraries; coverage only); `CHECK (in_study_area = (city IS NOT NULL))` |
+| `proximity_eligible` | `BOOLEAN` | `false` for exclusively virtual schools; always `true` for libraries |
+| `attributes` | `JSONB` | Source-specific fields: schools (level, grades, charter, district, address, county, website, enrolment); libraries (system, address, phone, square feet, annual hours, weeks open) |
 | `geom` | `geometry(Point, 26911)` | GiST index |
 
 **`city_boundaries`** — one row per study place: `geoid`, `name`, `place_type`
@@ -92,6 +92,24 @@ Verified results (2026-11-02):
   resolution) gives identical values for area, both populations (all four
   radii for ages 5–17, verified 2026-11-10) and the number of contributing
   schools.
+
+Library coverage (any central or branch library, including the 6 context
+libraries up to 3.2 km outside the study area; query 7c):
+
+| Place | Residents ½ mi (800 m) | Residents 1 mi (1.6 km) | Residents 2 mi (3.2 km) | Area 2 mi |
+|---|---|---|---|---|
+| Colton | 12.9 % | 46.5 % | 98.4 % | 85.1 % |
+| Grand Terrace | 31.7 % | 92.7 % | 100.0 % | 100.0 % |
+| Highland | 6.1 % | 22.9 % | 63.6 % | 35.2 % |
+| Loma Linda | 17.6 % | 61.9 % | 99.8 % | 93.3 % |
+| Mentone | 26.7 % | 72.4 % | 93.8 % | 61.3 % |
+| Redlands | 4.8 % | 29.1 % | 87.9 % | 55.7 % |
+| Rialto | 7.9 % | 31.2 % | 96.8 % | 83.7 % |
+| San Bernardino | 8.2 % | 31.8 % | 81.5 % | 56.4 % |
+| Yucaipa | 8.8 % | 32.3 % | 74.9 % | 45.3 % |
+
+  An independent GeoPandas calculation gives identical values for area, both
+  populations and contributing libraries at all three radii (verified 2026-11-18).
 
 ## Performance
 

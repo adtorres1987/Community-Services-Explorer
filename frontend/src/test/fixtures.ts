@@ -40,6 +40,35 @@ export function makeFacility(overrides: Partial<FacilityProperties> = {}): Facil
   }
 }
 
+export function makeLibrary(overrides: Partial<FacilityProperties> = {}): Facility {
+  const properties: FacilityProperties = {
+    id: 1001,
+    name: 'A. K. Smiley Public Library',
+    facility_type: 'library',
+    facility_subtype: 'Central',
+    city: 'Redlands',
+    address_city: 'Redlands',
+    in_study_area: true,
+    proximity_eligible: true,
+    attributes: {
+      LibrarySystem: 'A. K. Smiley Public Library',
+      Address: '125 W. Vine St.',
+      Zip: '92373',
+      Phone: '9097985911',
+      SquareFeet: 64636,
+      AnnualHours: 2769,
+      WeeksOpen: 52,
+    },
+    ...overrides,
+  }
+  return {
+    type: 'Feature',
+    id: properties.id,
+    geometry: { type: 'Point', coordinates: [-117.18, 34.06] },
+    properties,
+  }
+}
+
 export function makeResult(overrides: Partial<CityProximity> = {}): CityProximity {
   return {
     city: 'Redlands',
@@ -70,6 +99,7 @@ export function makePlace(name: string, overrides: Partial<CityProperties> = {})
     population: 1000,
     population_5_17: 200,
     facility_count: 0,
+    facility_counts: {},
     ...overrides,
   }
 }

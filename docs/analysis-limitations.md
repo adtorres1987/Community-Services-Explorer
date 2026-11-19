@@ -2,7 +2,7 @@
 
 The proximity analysis answers a narrow question: *what share of each
 community's residents, and of its area, lies within a straight-line radius of
-a public school?* It is easy to read more into the result than it supports.
+a public school, or of a public library?* It is easy to read more into the result than it supports.
 These are the known limitations.
 
 ## What the radius does not measure
@@ -13,7 +13,8 @@ These are the known limitations.
   times (roadmap Phase 8).
 - **Proximity is not access.** The analysis ignores enrolment boundaries,
   school choice, capacity, grade levels served, transport and quality.
-  A school nearby may not be one a given student can attend.
+  A school nearby may not be one a given student can attend; a library nearby
+  may be open few hours.
 - **School-age is by age only.** "Ages 5–17" counts residents of that age
   (2020 DHC), not enrolled students: it includes children who are home-schooled
   or attend private schools, and excludes pre-kindergarten. All residents
@@ -63,10 +64,20 @@ These are the known limitations.
   city with legal limits.
 - **Public schools only.** Private schools, preschools and colleges are not in
   the CDE dataset.
+- **Libraries: fixed public outlets only.** Central and branch libraries of
+  public library systems count; bookmobiles, county law libraries, school and
+  academic libraries do not. A small branch open 1,008 hours a year counts the
+  same as a 64,000 sq ft central library: size and hours are shown in the
+  popup but do not weight the coverage.
+- **Library radii are in miles** (½, 1, 2 miles, rounded to 800 m, 1.6 km and
+  3.2 km), as is usual in US library planning; they are not comparable with
+  the school radii. Libraries up to 3.2 km outside the study area count, so
+  there is no edge effect at the largest radius either.
 
 ## Source and method details
 
-- **Snapshot in time.** All sources were downloaded on 2026-11-02;
+- **Snapshot in time.** Sources were downloaded between 2026-11-02 and
+  2026-11-18 (library data are for fiscal year 2024);
   `scripts/download_data.py` detects later changes by checksum.
 - **TIGER/Line boundaries are cartographic,** intended for statistical use,
   not legal boundary determination.

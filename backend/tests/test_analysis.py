@@ -2,6 +2,9 @@
 # data/processed/study_area.gpkg (see docs/database.md).
 import pytest
 
+SCHOOLS = {"facility_type": "school"}
+LIBRARIES = {"facility_type": "library"}
+
 
 @pytest.mark.parametrize(
     ("city", "radius_m", "area_pct", "population_pct", "age_5_17_pct", "contributing"),
@@ -20,7 +23,7 @@ import pytest
 def test_coverage_matches_verified_values(
     client, city, radius_m, area_pct, population_pct, age_5_17_pct, contributing
 ):
-    response = client.get("/analysis/proximity", params={"city": city, "radius_m": radius_m})
+    response = client.get("/analysis/proximity", params={"city": city, "radius_m": radius_m, **SCHOOLS})
     assert response.status_code == 200
     [result] = response.json()["results"]
     assert result["city"] == city
@@ -32,7 +35,7 @@ def test_coverage_matches_verified_values(
 
 
 def test_all_places_and_virtual_exclusion(client):
-    body = client.get("/analysis/proximity", params={"radius_m": 500}).json()
+    body = client.get("/analysis/proximity", params={"radius_m": 500, **SCHOOLS}).json()
     results = {r["city"]: r for r in body["results"]}
     assert set(results) == {
         "Colton", "Grand Terrace", "Highland", "Loma Linda", "Mentone",
@@ -48,7 +51,7 @@ def test_all_places_and_virtual_exclusion(client):
 def test_contributing_ids_allow_distinct_counts_across_places(client):
     results = {
         r["city"]: r
-        for r in client.get("/analysis/proximity", params={"radius_m": 1000}).json()["results"]
+        for r in client.get("/analysis/proximity", params={"radius_m": 1000, **SCHOOLS}).json()["results"]
     }
     for result in results.values():
         assert len(result["contributing_facility_ids"]) == result["contributing_facilities"]
@@ -62,14 +65,14 @@ def test_contributing_ids_allow_distinct_counts_across_places(client):
 def test_neighbouring_schools_add_coverage(client):
     # Yucaipa has 13 eligible schools of its own; two more nearby reach it at 1 km
     [result] = client.get(
-        "/analysis/proximity", params={"city": "Yucaipa", "radius_m": 1000}
+        "/analysis/proximity", params={"city": "Yucaipa", "radius_m": 1000, **SCHOOLS}
     ).json()["results"]
     assert result["eligible_facilities"] == 13
     assert result["contributing_facilities"] == 15
 
 
 def test_population_never_exceeds_total(client):
-    body = client.get("/analysis/proximity", params={"radius_m": 2000}).json()
+    body = client.get("/analysis/proximity", params={"radius_m": 2000, **SCHOOLS}).json()
     for result in body["results"]:
         assert 0 <= result["covered_population"] <= result["population"]
         assert 0 <= result["covered_population_pct"] <= 100
@@ -79,7 +82,7 @@ def test_population_never_exceeds_total(client):
 
 def test_population_5_17_totals(client):
     # 2020 DHC table P12, ages 5-17 (verified independently with GeoPandas)
-    results = client.get("/analysis/proximity", params={"radius_m": 1000}).json()["results"]
+    results = client.get("/analysis/proximity", params={"radius_m": 1000, **SCHOOLS}).json()["results"]
     assert sum(r["population_5_17"] for r in results) == 120469
     assert sum(r["covered_population_5_17"] for r in results) == 101455
 
@@ -101,7 +104,7 @@ def test_type_without_facilities_has_no_coverage(client):
 def test_filter_by_subtype(client):
     body = client.get(
         "/analysis/proximity",
-        params={"city": "Redlands", "radius_m": 1000, "facility_subtype": "High"},
+        params={"city": "Redlands", "radius_m": 1000, "facility_subtype": "High", **SCHOOLS},
     ).json()
     [result] = body["results"]
     assert body["facility_subtype"] == "High"
@@ -110,7 +113,52 @@ def test_filter_by_subtype(client):
     assert result["covered_population_pct"] == 15.9
 
 
-@pytest.mark.parametrize("radius_m", [50, 5000, "abc"])
+@pytest.mark.parametrize(
+    ("city", "radius_m", "area_pct", "population_pct", "age_5_17_pct", "contributing"),
+    [
+        ("Loma Linda", 800, 8.6, 17.6, 15.0, 1),
+        ("Grand Terrace", 800, 26.1, 31.7, 30.7, 2),
+        ("Mentone", 1600, 23.9, 72.4, 74.6, 1),
+        ("Redlands", 1600, 12.1, 29.1, 29.7, 3),
+        ("San Bernardino", 1600, 20.0, 31.8, 33.6, 8),
+        ("Rialto", 3200, 83.7, 96.8, 97.1, 8),
+        ("Yucaipa", 3200, 45.3, 74.9, 76.9, 2),
+        ("Highland", 3200, 35.2, 63.6, 67.6, 3),
+    ],
+)
+def test_library_coverage_matches_verified_values(
+    client, city, radius_m, area_pct, population_pct, age_5_17_pct, contributing
+):
+    params = {"city": city, "radius_m": radius_m, **LIBRARIES}
+    [result] = client.get("/analysis/proximity", params=params).json()["results"]
+    assert result["covered_pct"] == area_pct
+    assert result["covered_population_pct"] == population_pct
+    assert result["covered_population_5_17_pct"] == age_5_17_pct
+    assert result["contributing_facilities"] == contributing
+    assert result["excluded_facilities"] == 0
+
+
+def test_library_totals_at_two_miles(client):
+    # Context libraries up to 3.2 km away (Fontana, Bloomington, Muscoy, Calimesa,
+    # Highgrove) contribute: 20 distinct libraries for 14 inside the study area
+    results = client.get("/analysis/proximity", params={"radius_m": 3200, **LIBRARIES}).json()["results"]
+    assert sum(r["eligible_facilities"] for r in results) == 14
+    assert len({i for r in results for i in r["contributing_facility_ids"]}) == 20
+    assert sum(r["covered_population"] for r in results) == 523161
+    assert sum(r["covered_population_5_17"] for r in results) == 104430
+
+
+def test_types_are_analysed_separately(client):
+    def contributing(params):
+        [result] = client.get(
+            "/analysis/proximity", params={"city": "Redlands", "radius_m": 1000, **params}
+        ).json()["results"]
+        return result["contributing_facilities"]
+
+    assert contributing(SCHOOLS) + contributing({"facility_type": "library"}) == contributing({})
+
+
+@pytest.mark.parametrize("radius_m", [50, 3201, 5000, "abc"])
 def test_invalid_radius_returns_422(client, radius_m):
     response = client.get("/analysis/proximity", params={"radius_m": radius_m})
     assert response.status_code == 422

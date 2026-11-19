@@ -1,21 +1,23 @@
-import { CATEGORIES, CATEGORY_COLORS } from '../features/facilities/schools'
+import type { ServiceConfig } from '../features/facilities/services'
 import { BOUNDARY_STYLE, COVERAGE_STYLE } from '../maps/basemap'
 
-export function Legend() {
+export function Legend({ service }: { service: ServiceConfig }) {
   return (
     <section className="panel" aria-labelledby="legend-heading">
       <h2 id="legend-heading">Legend</h2>
       <ul className="legend">
-        {CATEGORIES.map((category) => (
-          <li key={category}>
-            <span className="swatch swatch--dot" style={{ background: CATEGORY_COLORS[category] }} />
-            {category}
+        {service.categories.map((category) => (
+          <li key={category.name}>
+            <span className="swatch swatch--dot" style={{ background: category.color }} />
+            {category.name}
           </li>
         ))}
-        <li>
-          <span className="swatch swatch--dot swatch--hollow" />
-          Exclusively virtual (not in proximity analysis)
-        </li>
+        {service.excluded && (
+          <li>
+            <span className="swatch swatch--dot swatch--hollow" />
+            {service.excluded.legend}
+          </li>
+        )}
         <li>
           <span className="swatch swatch--dot swatch--faded" />
           Other community or outside the study area (still counts toward coverage)

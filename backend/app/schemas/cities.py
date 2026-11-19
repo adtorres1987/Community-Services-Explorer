@@ -12,7 +12,8 @@ class CityProperties(BaseModel):
     area_km2: float
     population: int  # 2020 census, apportioned from blocks
     population_5_17: int | None  # aged 5-17 (2020 DHC); null before migration 003
-    facility_count: int  # facilities inside the boundary
+    facility_count: int  # facilities of any type inside the boundary
+    facility_counts: dict[str, int]  # by facility_type, e.g. {"school": 22, "library": 1}
 
 
 class CityFeature(BaseModel):

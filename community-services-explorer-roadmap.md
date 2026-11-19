@@ -65,6 +65,22 @@ Mentone (CDP, no incorporada), Redlands, Rialto, San Bernardino y Yucaipa.
     datos (el GeoPackage sigue en ~3 MB).
 -   Desarrollado en la rama `feature/school-age-population`.
 
+### Fase 7 (en curso): bibliotecas públicas
+
+-   Fuente: IMLS Public Libraries Survey FY 2024 (dominio público), ficheros
+    de sedes y de sistemas. Se excluyen las bibliotecas jurídicas de condado
+    (`C_FSCS = N`), los bibliobuses y las sedes cerradas temporalmente.
+-   14 bibliotecas en las nueve comunidades y 6 de contexto (a menos de
+    3,2 km); a 2 millas de una biblioteca vive el 85,4 % de los residentes.
+-   Un servicio a la vez en la aplicación (selector "Schools / Libraries"),
+    cada uno con sus radios: ½, 1 y 2 millas para bibliotecas. Límite de la
+    API ampliado a 3.200 m.
+-   Sin migración: la tabla `facilities` ya era genérica. El pipeline
+    comparte `assign_to_places` y el frontend usa un registro de servicios.
+-   Pendientes de la fase: transporte (GTFS de Omnitrans), salud (CDPH) y
+    parques (fuente con licencia por confirmar).
+-   Desarrollado en la rama `feature/library-services`.
+
 Documentación técnica: `README.md` y `docs/`.
 
 ------------------------------------------------------------------------
@@ -536,7 +552,7 @@ Estas funcionalidades no deben bloquear la primera entrega.
 Incorporar, después de verificar fuentes y licencias:
 
 -   Parques y espacios recreativos.
--   Bibliotecas.
+-   Bibliotecas. *(Hecho: IMLS PLS FY 2024.)*
 -   Centros comunitarios.
 -   Hospitales y clínicas.
 -   Transporte público.

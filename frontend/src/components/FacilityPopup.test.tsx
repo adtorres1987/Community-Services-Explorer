@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
-import { makeFacility } from '../test/fixtures'
+import { makeFacility, makeLibrary } from '../test/fixtures'
 import { FacilityPopup } from './FacilityPopup'
 
 describe('FacilityPopup', () => {
@@ -46,5 +46,23 @@ describe('FacilityPopup', () => {
     facility.properties.attributes.Website = 'javascript:alert(1)'
     render(<FacilityPopup facility={facility.properties} />)
     expect(screen.queryByRole('link')).not.toBeInTheDocument()
+  })
+
+  it('shows library attributes', () => {
+    render(<FacilityPopup facility={makeLibrary().properties} />)
+    expect(screen.getByRole('heading', { name: 'A. K. Smiley Public Library' })).toBeInTheDocument()
+    expect(screen.getByText('Central library')).toBeInTheDocument()
+    expect(screen.getByText('System').nextSibling).toHaveTextContent('A. K. Smiley Public Library')
+    expect(screen.getByText('125 W. Vine St., Redlands, 92373')).toBeInTheDocument()
+    expect(screen.getByText('64,636 sq ft')).toBeInTheDocument()
+    expect(screen.getByText('2,769 h/year (52 weeks)')).toBeInTheDocument()
+    expect(screen.queryByText('District')).not.toBeInTheDocument()
+    expect(screen.queryByRole('link')).not.toBeInTheDocument()
+  })
+
+  it('explains libraries outside the study area', () => {
+    const library = makeLibrary({ name: 'Calimesa Library', city: null, address_city: 'Calimesa', in_study_area: false })
+    render(<FacilityPopup facility={library.properties} />)
+    expect(screen.getByText(/not included in library counts/)).toBeInTheDocument()
   })
 })

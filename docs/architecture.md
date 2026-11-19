@@ -2,13 +2,14 @@
 
 ```text
  CDE schools GeoJSON ───────┐
+ IMLS library outlets ──────┤
  TIGER/Line 2026 places ────┤
  TIGER/Line 2020 blocks ────┼─ scripts/download_data.py ─► data/raw/ (not committed)
  Census 2020 P.L. 94-171 ───┤
  Census 2020 DHC (ages) ────┘
                          │
                          ▼
-              scripts/prepare_study_area.py   assign by boundary, context schools,
+              scripts/prepare_study_area.py   assign by boundary, context facilities,
                          │                    apportion block population (total, 5–17)
                          ▼
           data/processed/study_area.gpkg   (committed, ~3 MB, EPSG:26911)
@@ -50,14 +51,21 @@
 - **Spatial work happens in PostGIS.** The API does not load geometries into
   Python to compute coverage; the database buffers, unions, clips and sums
   population in one query.
-- **Assignment by boundary, not address.** Schools belong to the place that
+- **Assignment by boundary, not address.** Facilities belong to the place that
   contains them; mailing-address cities include neighbourhoods and typos.
-- **No edge effect.** Schools up to 2 km outside the study area (the largest
-  radius) are loaded as context so coverage near boundaries is complete.
+- **No edge effect.** Facilities up to the largest radius offered for their
+  service outside the study area (2 km for schools, 3.2 km for libraries) are
+  loaded as context so coverage near boundaries is complete.
 - **Population as well as area.** Area coverage alone misleads where land is
   hills or open space; residents are estimated from 2020 census blocks.
 - **Generic `facilities` table.** Common columns plus a JSONB `attributes`
-  column, so parks or libraries (roadmap Phase 7) fit without schema changes.
+  column: libraries were added without a schema change, and the API filters
+  by `facility_type`.
+- **One service at a time, each with its own settings.** The frontend's
+  service registry (`features/facilities/services.ts`) holds each service's
+  labels, colours, radii and caveat; the pipeline has one selection function
+  per source and a shared `assign_to_places`. Radii follow each service's
+  planning conventions (metres for schools, miles for libraries).
 - **Flags instead of deletions.** Context and virtual schools stay in the data
   with `in_study_area` / `proximity_eligible` flags, so every exclusion is
   visible and explainable.
@@ -65,7 +73,7 @@
   `scripts/prepare_study_area.py` lists TIGER/Line GEOIDs; the API and the
   frontend read the places from the database.
 - **Committed processed data.** The ~3 MB GeoPackage is committed so the app
-  and CI run from a clone without downloading ~100 MB of census files, and
+  and CI run from a clone without downloading ~1.2 GB of source files, and
   even if the publishers update their datasets; the raw sources are
   reproducible with checksums. Block geometry is simplified (1 m) to keep it small.
 - **Same-origin deployment.** nginx serves the built frontend and proxies

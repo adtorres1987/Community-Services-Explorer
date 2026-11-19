@@ -26,8 +26,11 @@ builds the app with `VITE_API_URL=/api` and serves it with nginx, which proxies
 ```text
 src/
 ├── components/   MapView, FilterPanel, StatisticsPanel, FacilityPopup, Legend
-├── features/
-│   └── facilities/schools.ts   school categories, colours, labels, filters
+├── features/facilities/
+│   ├── services.ts             service registry: labels, colours, radii, caveat per service
+│   ├── schools.ts, libraries.ts  service-specific categories, colours and labels
+│   ├── filters.ts              community / subtype selection and focus
+│   └── coverage.ts             combines per-place results (weighted totals)
 ├── maps/basemap.ts             basemap and layer styles
 ├── services/
 │   ├── api.ts                  typed API client (mirrors backend schemas)
@@ -40,8 +43,14 @@ Tests sit next to the code they cover (`*.test.ts`, `*.test.tsx`).
 
 ## Notes
 
-- Facilities are loaded once (~200 records) and filtered in the browser. The
-  proximity analysis is requested from the API for each radius / school type.
+- One service at a time ("Service": Schools / Libraries). Facilities of every
+  type are loaded once (~225 records) and filtered in the browser; the
+  proximity analysis is requested from the API for each service, radius and
+  subtype. Each service has its own radii (`services.ts`); switching service
+  keeps the coverage on at the new service's closest radius.
+- To add a service: load it in the pipeline with a `facility_type`, add an
+  entry to `SERVICES` and, if it has its own attributes, a section in
+  `FacilityPopup`.
 - One or several communities can be selected (no selection = all). The
   statistics table then lists only the selected communities with a weighted
   total, and one sentence summarizes the selection; contributing schools are
@@ -49,10 +58,10 @@ Tests sit next to the code they cover (`*.test.ts`, `*.test.tsx`).
 - "Population" switches the statistics between all residents and residents
   aged 5–17; area and the map do not change. The option is disabled if the
   API returns no age data (database loaded before migration 003).
-- Selecting communities highlights their schools; schools in other communities
-  and context schools stay on the map, faded, because they still count toward
-  coverage. Schools of other types are hidden, since coverage uses only the
-  selected type.
+- Selecting communities highlights their facilities; facilities in other
+  communities and context facilities stay on the map, faded, because they still
+  count toward coverage. Facilities of other subtypes are hidden, since coverage
+  uses only the selected subtype.
 - Basemap: OpenStreetMap standard tiles, desaturated in CSS. They are for light
   use under the [OSM tile usage policy](https://operations.osmfoundation.org/policies/tiles/);
   a public deployment with real traffic should use a tile provider with a key.

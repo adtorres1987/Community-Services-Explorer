@@ -3,22 +3,25 @@
 [![CI](https://github.com/adtorres1987/Community-Services-Explorer/actions/workflows/ci.yml/badge.svg)](https://github.com/adtorres1987/Community-Services-Explorer/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-A geospatial web application for exploring public schools in nine contiguous
-communities of the **San Bernardino Valley, California** — Colton, Grand
-Terrace, Highland, Loma Linda, Mentone, Redlands, Rialto, San Bernardino and
-Yucaipa — and how many residents, and how much land, lie within a
-straight-line radius of one. Built end to end, from raw public data to an
+A geospatial web application for exploring public schools and public libraries
+in nine contiguous communities of the **San Bernardino Valley, California** —
+Colton, Grand Terrace, Highland, Loma Linda, Mentone, Redlands, Rialto, San
+Bernardino and Yucaipa — and how many residents, and how much land, lie within
+a straight-line radius of one. Built end to end, from raw public data to an
 interactive map: Python data pipeline → PostGIS → FastAPI → React + Leaflet.
 
 ![Nine communities with 1 km proximity coverage](docs/images/overview-1km.jpg)
 
 ## Features
 
-- Map of 173 active public schools in nine communities (612,335 residents),
-  colour-coded by school type, plus 32 nearby schools that count toward coverage
-- Schools assigned to communities by boundary, not by mailing address
-- Filters by one or several communities and by school type; popups with district, grades, enrolment and instruction mode
-- Proximity coverage at 500 m, 1 km, 1.5 km or 2 km, computed in PostGIS and drawn on the map
+- Two services, one at a time: **173 public schools** (plus 32 nearby schools that
+  count toward coverage) and **14 public libraries** (plus 6 nearby), in nine
+  communities with 612,335 residents
+- Facilities assigned to communities by boundary, not by mailing address
+- Filters by service, by one or several communities and by type; popups with
+  district, grades and enrolment for schools, system, size and opening hours for libraries
+- Proximity coverage with radii suited to each service — 500 m to 2 km for schools,
+  ½, 1 and 2 miles for libraries — computed in PostGIS and drawn on the map
 - Coverage by **population** — all residents or **school-age residents (5–17)** — from
   2020 census blocks apportioned by area, and by area
 - Statistics for the selected communities (any combination) with a weighted total, and the method and its limits stated in the UI
@@ -38,12 +41,21 @@ interactive map: Python data pipeline → PostGIS → FastAPI → React + Leafle
 | Yucaipa | 13 | 59.4 % | 61.6 % | 35.3 % |
 | **All nine** | **173** | **81.8 %** | **84.2 %** | **48.7 %** |
 
+| Libraries | ½ mile (800 m) | 1 mile (1.6 km) | 2 miles (3.2 km) |
+|---|---|---|---|
+| Residents within | 9.2 % | 35.1 % | 85.4 % |
+| Ages 5–17 within | 8.9 % | 35.7 % | 86.7 % |
+| Area within | 5.4 % | 20.6 % | 60.8 % |
+
+![Public libraries with 2-mile coverage](docs/images/libraries-2mi.jpg)
+
 *Straight-line distance, not travel time; any public school of any type and
-grade level counts. See [analysis limitations](docs/analysis-limitations.md).*
+grade level counts, and any central or branch public library. See
+[analysis limitations](docs/analysis-limitations.md).*
 
 <p>
   <img src="docs/images/redlands-500m-popup.jpg" alt="Mentone and Redlands at 500 m, counting residents aged 5–17, with a school popup" width="68%">
-  <img src="docs/images/mobile.jpg" alt="Mobile layout" width="24%">
+  <img src="docs/images/mobile.jpg" alt="Mobile layout, libraries at 1 mile" width="24%">
 </p>
 
 ## Quick start (Docker)
@@ -91,7 +103,7 @@ npm run dev
 ### Rebuilding the data from the original sources
 
 ```bash
-python scripts/download_data.py       # CDE schools + Census boundaries and population (~1.2 GB), checksum-verified
+python scripts/download_data.py       # schools, libraries, Census boundaries and population (~1.2 GB), checksum-verified
 python scripts/prepare_study_area.py  # assign by boundary, add population → data/processed/study_area.gpkg
 python scripts/load_postgis.py
 ```
@@ -152,6 +164,7 @@ docs/           architecture, data sources, database, API, limitations
 | [California Public Schools 2025–26](https://data.ca.gov/@california-department-of-education/california-public-schools-2025-26) | California Department of Education | No restrictions on public use |
 | [TIGER/Line 2026 Places, California](https://www2.census.gov/geo/tiger/TIGER2026/PLACE/) | U.S. Census Bureau | Public domain |
 | [TIGER/Line 2020 blocks](https://www2.census.gov/geo/tiger/TIGER2020PL/LAYER/TABBLOCK/2020/), [2020 P.L. 94-171 population](https://www2.census.gov/programs-surveys/decennial/2020/data/01-Redistricting_File--PL_94-171/California/) and [2020 DHC ages](https://www2.census.gov/programs-surveys/decennial/2020/data/demographic-and-housing-characteristics-file/California/) | U.S. Census Bureau | Public domain |
+| [Public Libraries Survey FY 2024](https://www.imls.gov/research-evaluation/surveys/public-libraries-survey-pls) (outlet and system files) | Institute of Museum and Library Services | Public domain (U.S. Government work) |
 | Basemap tiles | © [OpenStreetMap](https://www.openstreetmap.org/copyright) contributors | ODbL; [tile usage policy](https://operations.osmfoundation.org/policies/tiles/) |
 
 Field descriptions, checksums and processing criteria: [docs/data-sources.md](docs/data-sources.md).
@@ -169,7 +182,8 @@ Field descriptions, checksums and processing criteria: [docs/data-sources.md](do
 
 ## Next steps
 
-- More community services: parks, libraries, clinics, transit (the `facilities` table is already generic)
+- More community services: transit stops, clinics, parks (each is a data adapter in the
+  pipeline plus an entry in the frontend service registry)
 - Network-based accessibility: walking distance and service areas on the street network
 - OGC services (WMS/WFS, OGC API Features) and an ArcGIS Maps SDK comparison
 
