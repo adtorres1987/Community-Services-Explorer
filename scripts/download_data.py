@@ -50,6 +50,14 @@ SOURCES = [
         # ~1 GB; only the geographic header and segment 6 (table P12, sex by age) are needed
         "extract": ["cageo2020.dhc", "ca000062020.dhc"],
     },
+    {
+        "name": "IMLS Public Libraries Survey FY 2024 (CSV)",
+        "url": "https://www.imls.gov/sites/default/files/2026-06/pls_fy2024_csv.zip",
+        "path": RAW_DIR / "pls_fy2024/pls_fy2024_csv.zip",
+        "sha256": "73910b723f23d5ab6a45d472195621d5733a26c79e089494ae1e45f908bbbb8c",
+        # Outlet file (locations) and system file (library system names)
+        "extract": ["CSV/pls_fy24_outlet_pud24i.csv", "CSV/PLS_FY24_AE_pud24i.csv"],
+    },
 ]
 
 

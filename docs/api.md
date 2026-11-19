@@ -26,8 +26,12 @@ All geometries are GeoJSON in **EPSG:4326**. Distances are computed in EPSG:2691
 | GET | `/health` | — | API, database and PostGIS version; 503 if the database is unreachable |
 | GET | `/facilities` | `city`, `facility_type`, `facility_subtype` (all optional) | FeatureCollection of facilities, including context facilities |
 | GET | `/facilities/{id}` | `id` ≥ 1 | Feature |
-| GET | `/cities` | — | FeatureCollection of the nine study places with type, area, 2020 population (total and aged 5–17) and facility count |
-| GET | `/analysis/proximity` | `radius_m` (100–2000, required), `city`, `facility_type`, `facility_subtype` | Coverage per place, by area, population and population aged 5–17 |
+| GET | `/cities` | — | FeatureCollection of the nine study places with type, area, 2020 population (total and aged 5–17) and facility counts by type |
+| GET | `/analysis/proximity` | `radius_m` (100–3200, required), `city`, `facility_type`, `facility_subtype` | Coverage per place, by area, population and population aged 5–17 |
+
+`facility_type` is `school` or `library`. Without it, `/facilities` returns
+every type and `/analysis/proximity` treats all types as one service, which is
+rarely meaningful: the frontend always sends it.
 
 The API keeps the name `city` for a study place; Mentone is a CDP, not a city.
 
@@ -36,7 +40,8 @@ The API keeps the name `city` for a study place; Mentone is a CDP, not a city.
 `city` is the study place whose boundary contains the facility, and the `city`
 filter uses it. `address_city` is the mailing address from the source and can
 differ. Context facilities (`in_study_area: false`, `city: null`) are within
-2 km of the study area and only contribute to coverage.
+the largest radius offered for their service (2 km for schools, 3.2 km for
+libraries) of the study area and only contribute to coverage.
 
 ```json
 {
@@ -52,10 +57,31 @@ differ. Context facilities (`in_study_area: false`, `city: null`) are within
 }
 ```
 
+Libraries (`facility_subtype` is `Central` or `Branch`) carry the system and
+outlet details from the Public Libraries Survey:
+
+```json
+{
+  "name": "A. K. Smiley Public Library",
+  "facility_type": "library",
+  "facility_subtype": "Central",
+  "city": "Redlands",
+  "attributes": {
+    "LibrarySystem": "A. K. Smiley Public Library", "Address": "125 W. Vine St.", "Zip": "92373",
+    "Phone": "9097987565", "SquareFeet": 64636, "AnnualHours": 2769, "WeeksOpen": 52
+  }
+}
+```
+
+### `/cities`
+
+Each place has `facility_count` (all types) and `facility_counts` by type,
+e.g. `{"school": 22, "library": 1}` for Redlands.
+
 ### `/analysis/proximity`
 
 For each place: the part of its area within `radius_m` of **any**
-proximity-eligible facility (including facilities in neighbouring places and
+proximity-eligible facility of the requested `facility_type` (including facilities in neighbouring places and
 context facilities), clipped to the boundary and returned as `coverage`
 geometry; and the share of its 2020 residents in that area, apportioning each
 census block's population by the share of its area covered. The same is
@@ -64,7 +90,7 @@ computed for residents aged 5–17 (2020 DHC, table P12).
 ```json
 {
   "radius_m": 1000,
-  "facility_type": null,
+  "facility_type": "school",
   "facility_subtype": null,
   "method": "Straight-line (Euclidean) distance measured in EPSG:26911. ...",
   "results": [
@@ -110,7 +136,7 @@ computed for residents aged 5–17 (2020 DHC, table P12).
 | Status | When |
 |---|---|
 | 404 | Unknown `city`, or facility `id` not found |
-| 422 | Invalid parameters (e.g. `radius_m` outside 100–2000, non-numeric `id`) |
+| 422 | Invalid parameters (e.g. `radius_m` outside 100–3200, non-numeric `id`) |
 | 503 | Database unavailable (`{"detail": "Database unavailable"}`) |
 
 ## Tests

@@ -11,7 +11,8 @@ import {
   useMapEvents,
 } from 'react-leaflet'
 import type { CityCollection, CityProximity, FacilityCollection } from '../services/api'
-import { CATEGORY_COLORS, isSelected, schoolCategory } from '../features/facilities/schools'
+import { isSelected } from '../features/facilities/filters'
+import type { ServiceConfig } from '../features/facilities/services'
 import {
   BASEMAP,
   BOUNDARY_STYLE,
@@ -22,6 +23,7 @@ import {
 import { FacilityPopup } from './FacilityPopup'
 
 interface Props {
+  service: ServiceConfig
   cities: CityCollection | undefined
   facilities: FacilityCollection['features']
   /** Facilities drawn at full strength; the others are faded */
@@ -64,7 +66,7 @@ function FitToCities({ cities, selectionKey }: { cities: CityCollection; selecti
   return null
 }
 
-export function MapView({ cities, facilities, focusedIds, coverage, selectedCities }: Props) {
+export function MapView({ service, cities, facilities, focusedIds, coverage, selectedCities }: Props) {
   const selectionKey = selectedCities.join('|')
   return (
     <MapContainer
@@ -73,18 +75,18 @@ export function MapView({ cities, facilities, focusedIds, coverage, selectedCiti
       // Fractional zoom lets fitBounds fill narrow (mobile) maps instead of jumping a level out
       zoomSnap={0.25}
       className="map"
-      aria-label="Map of schools in the study communities"
+      aria-label={`Map of ${service.plural} in the study communities`}
     >
       <TileLayer {...BASEMAP} />
 
-      {/* Panes fix the draw order: coverage below boundaries below school markers */}
+      {/* Panes fix the draw order: coverage below boundaries below facility markers */}
       <Pane name="coverage" style={{ zIndex: 350 }}>
         {coverage.map(
           (result) =>
             result.coverage && (
               // GeoJSON layers are immutable in react-leaflet; the key re-creates them on change
               <GeoJSON
-                key={`${result.city}:${result.covered_area_km2}`}
+                key={`${service.type}:${result.city}:${result.covered_area_km2}`}
                 data={result.coverage}
                 style={COVERAGE_STYLE}
                 interactive={false}
@@ -110,7 +112,7 @@ export function MapView({ cities, facilities, focusedIds, coverage, selectedCiti
 
       {facilities.map((facility) => {
         const [lon, lat] = facility.geometry.coordinates
-        const color = CATEGORY_COLORS[schoolCategory(facility.properties.facility_subtype)]
+        const color = service.color(facility.properties.facility_subtype)
         const eligible = facility.properties.proximity_eligible
         const focused = focusedIds.has(facility.properties.id)
         return (

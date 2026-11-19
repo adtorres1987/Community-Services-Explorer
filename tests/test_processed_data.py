@@ -27,6 +27,17 @@ def schools():
     return gpd.read_file(ps.OUTPUT_PATH, layer="schools")
 
 
+LIBRARIES_BY_PLACE = {
+    "Colton": 2, "Grand Terrace": 1, "Highland": 1, "Loma Linda": 1, "Mentone": 1,
+    "Redlands": 1, "Rialto": 2, "San Bernardino": 4, "Yucaipa": 1,
+}
+
+
+@pytest.fixture(scope="module")
+def libraries():
+    return gpd.read_file(ps.OUTPUT_PATH, layer="libraries")
+
+
 @pytest.fixture(scope="module")
 def cities():
     return gpd.read_file(ps.OUTPUT_PATH, layer="city_boundaries")
@@ -39,7 +50,12 @@ def units():
 
 def test_layers():
     layers = dict(pyogrio.list_layers(ps.OUTPUT_PATH))
-    assert layers == {"schools": "Point", "city_boundaries": "MultiPolygon", "population_units": "MultiPolygon"}
+    assert layers == {
+        "schools": "Point",
+        "libraries": "Point",
+        "city_boundaries": "MultiPolygon",
+        "population_units": "MultiPolygon",
+    }
 
 
 def test_crs(schools, cities, units):
@@ -59,7 +75,27 @@ def test_context_schools_are_near_the_study_area(schools, cities):
     context = schools[~schools["in_study_area"]]
     distance = context.geometry.distance(cities.union_all())
     assert (distance > 0).all()
-    assert (distance <= ps.CONTEXT_DISTANCE_M).all()
+    assert (distance <= ps.SCHOOL_CONTEXT_DISTANCE_M).all()
+
+
+def test_library_counts(libraries, cities):
+    study = libraries[libraries["in_study_area"]]
+    assert study.groupby("study_city").size().to_dict() == LIBRARIES_BY_PLACE
+    assert len(libraries) == 20
+    assert libraries["library_id"].is_unique
+    assert libraries["proximity_eligible"].all()
+    assert set(libraries["outlet_type"]) == {"Central", "Branch"}
+    # County law libraries do not meet the public library definition (C_FSCS = N)
+    assert not libraries["name"].str.contains("Law Library").any()
+    context = libraries[~libraries["in_study_area"]]
+    distance = context.geometry.distance(cities.union_all())
+    assert ((distance > 0) & (distance <= ps.LIBRARY_CONTEXT_DISTANCE_M)).all()
+
+
+def test_library_points_match_source_coordinates(libraries):
+    wgs84 = libraries.to_crs("EPSG:4326").geometry
+    assert ((wgs84.x - libraries["LONGITUD"]).abs() < 1e-5).all()
+    assert ((wgs84.y - libraries["LATITUDE"]).abs() < 1e-5).all()
 
 
 def test_population(cities, units):

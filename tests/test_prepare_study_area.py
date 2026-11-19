@@ -222,3 +222,78 @@ def test_apportion_population_requires_every_block():
     )
     with pytest.raises(ValueError, match="without population"):
         ps.apportion_population(blocks, pd.DataFrame({"GEOID20": ["b"], "population": [1]}), cities)
+
+
+def outlet(seq, x, y, **overrides):
+    """PLS outlet record (strings, as read from the CSV) at UTM x, y."""
+    lon_lat = gpd.GeoSeries([Point(x, y)], crs="EPSG:26911").to_crs("EPSG:4326").iloc[0]
+    row = {
+        "STABR": "CA", "FSCSKEY": "CA0001", "FSCS_SEQ": seq, "C_FSCS": "Y", "C_OUT_TY": "BR",
+        "STATSTRU": "00", "LIBNAME": f"BRANCH {seq} LIBRARY", "ADDRESS": "1 MAIN ST.",
+        "CITY": "ALPHA", "ZIP": "92373", "PHONE": "9095550100", "SQ_FEET": "5000",
+        "HOURS": "1776", "WKS_OPEN": "52", "LONGITUD": str(lon_lat.x), "LATITUDE": str(lon_lat.y),
+    }
+    row.update(overrides)
+    return row
+
+
+SYSTEMS = pd.DataFrame([
+    {"FSCSKEY": "CA0001", "LIBNAME": "ALPHA COUNTY LIBRARY"},
+    {"FSCSKEY": "CA0002", "LIBNAME": "LAW LIBRARY FOR ALPHA COUNTY"},
+])
+
+
+def test_select_libraries_keeps_public_fixed_open_outlets():
+    cities = ps.select_city_boundaries(make_places())
+    outlets = pd.DataFrame([
+        outlet("001", 481_000, 3_769_000, C_OUT_TY="CE", LIBNAME="ALPHA MAIN LIBRARY"),
+        outlet("002", 483_000, 3_769_000, SQ_FEET="-1"),  # in Beta; missing size
+        outlet("003", 486_000, 3_769_000),  # 2 km outside: context
+        outlet("004", 490_000, 3_769_000),  # 6 km outside: dropped
+        outlet("005", 481_500, 3_769_000, C_OUT_TY="BS"),  # bookmobile
+        outlet("006", 481_500, 3_768_500, STATSTRU="23"),  # temporarily closed
+        outlet("001", 481_200, 3_769_200, FSCSKEY="CA0002", C_FSCS="N"),  # law library
+        outlet("007", 481_000, 3_769_500, STABR="NV"),
+    ])
+    libraries = ps.select_libraries(outlets, SYSTEMS, cities).set_index("library_id")
+
+    assert list(libraries.index) == ["CA0001-001", "CA0001-002", "CA0001-003"]
+    assert libraries["study_city"].tolist() == ["Alpha", "Beta", None]
+    assert libraries["in_study_area"].tolist() == [True, True, False]
+    assert libraries["proximity_eligible"].all()
+    main = libraries.loc["CA0001-001"]
+    assert (main["name"], main["outlet_type"], main["system"]) == (
+        "Alpha Main Library", "Central", "Alpha County Library",
+    )
+    assert (main["address"], main["address_city"], main["square_feet"]) == ("1 Main St.", "Alpha", 5000)
+    assert pd.isna(libraries.loc["CA0001-002", "square_feet"])
+    assert libraries.crs.to_epsg() == 26911
+    assert libraries.loc["CA0001-001", "geometry"].distance(Point(481_000, 3_769_000)) < 0.01
+
+
+def test_select_libraries_context_distance_is_two_miles():
+    cities = ps.select_city_boundaries(make_places())
+    outlets = pd.DataFrame([
+        outlet("001", 484_000 + 3_150, 3_769_000),
+        outlet("002", 484_000 + 3_250, 3_769_000),
+    ])
+    libraries = ps.select_libraries(outlets, SYSTEMS, cities)
+    assert libraries["library_id"].tolist() == ["CA0001-001"]
+
+
+def test_select_libraries_rejects_duplicates_and_missing_coordinates():
+    cities = ps.select_city_boundaries(make_places())
+    with pytest.raises(ValueError, match="Duplicate"):
+        ps.select_libraries(
+            pd.DataFrame([outlet("001", 481_000, 3_769_000)] * 2), SYSTEMS, cities
+        )
+    with pytest.raises(ValueError, match="without coordinates"):
+        ps.select_libraries(
+            pd.DataFrame([outlet("001", 481_000, 3_769_000, LATITUDE="")]), SYSTEMS, cities
+        )
+
+
+def test_display_case_keeps_short_words_lower_case():
+    assert ps.display_case("MENTONE SENIOR CENTER AND LIBRARY") == "Mentone Senior Center and Library"
+    assert ps.display_case("656 N. 9TH ST.") == "656 N. 9th St."
+    assert ps.display_case(None) is None

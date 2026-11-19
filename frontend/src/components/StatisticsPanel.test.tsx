@@ -3,8 +3,9 @@ import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import type { ProximityResponse } from '../services/api'
 import type { PopulationGroup } from '../features/facilities/coverage'
+import { SERVICES, type ServiceType } from '../features/facilities/services'
 import type { RequestState } from '../services/useRequest'
-import { makeFacility, makePlace, makeResult } from '../test/fixtures'
+import { makeFacility, makeLibrary, makePlace, makeResult } from '../test/fixtures'
 import { StatisticsPanel } from './StatisticsPanel'
 
 const places = [
@@ -84,14 +85,17 @@ function renderPanel(
   radius: number | null,
   state = idle({ data: proximity }),
   populationGroup: PopulationGroup = 'all',
+  service: ServiceType = 'school',
+  shownFacilities = facilities,
 ) {
   render(
     <StatisticsPanel
+      service={SERVICES[service]}
       places={places}
       selectedCities={selectedCities}
       subtype={null}
       populationGroup={populationGroup}
-      facilities={facilities}
+      facilities={shownFacilities}
       radius={radius}
       proximity={state}
     />,
@@ -169,6 +173,17 @@ describe('StatisticsPanel', () => {
     expect(screen.getByRole('columnheader', { name: 'Ages 5–17 (2020)' })).toBeInTheDocument()
     expect(cells(/^Redlands/)).toEqual(['2', '12,118'])
     expect(cells(/^All \(3\)/)).toEqual(['4', '17,380'])
+  })
+
+  it('describes libraries with their own radius labels and no virtual exclusion', () => {
+    const libraries = [makeLibrary({ id: 11, city: 'Redlands' }), makeLibrary({ id: 12, city: 'Mentone' })]
+    const results = proximity.results.map((r) => ({ ...r, excluded_facilities: 0 }))
+    renderPanel(['Mentone', 'Redlands'], 1600, idle({ data: { ...proximity, results } }), 'all', 'library', libraries)
+    expect(screen.getByRole('columnheader', { name: 'Libraries' })).toBeInTheDocument()
+    expect(screen.getByRole('columnheader', { name: 'Residents within 1 mi' })).toBeInTheDocument()
+    expect(screen.getByText('All library types')).toBeInTheDocument()
+    expect(cells(/^Selected \(2\)/)[0]).toBe('2')
+    expect(detail()).toMatch(/within 1 mile \(1\.6 km\) of a library\. 5 libraries contribute, including 2 outside the selection\.$/)
   })
 
   it('reports analysis errors with a retry button', async () => {

@@ -1,16 +1,19 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
+import { SERVICES, type ServiceType } from '../features/facilities/services'
 import { makePlace } from '../test/fixtures'
 import { FilterPanel } from './FilterPanel'
 
 const places = [makePlace('Colton'), makePlace('Mentone', { place_type: 'CDP' }), makePlace('Rialto')]
 
-function renderPanel(cities: string[], ageDataAvailable = true) {
+function renderPanel(cities: string[], ageDataAvailable = true, service: ServiceType = 'school') {
   const onCitiesChange = vi.fn()
   const onPopulationGroupChange = vi.fn()
+  const onServiceChange = vi.fn()
   render(
     <FilterPanel
+      service={SERVICES[service]}
       places={places}
       subtypes={['Elementary', 'High']}
       cities={cities}
@@ -18,13 +21,14 @@ function renderPanel(cities: string[], ageDataAvailable = true) {
       radius={null}
       populationGroup="all"
       ageDataAvailable={ageDataAvailable}
+      onServiceChange={onServiceChange}
       onCitiesChange={onCitiesChange}
       onSubtypeChange={vi.fn()}
       onRadiusChange={vi.fn()}
       onPopulationGroupChange={onPopulationGroupChange}
     />,
   )
-  return Object.assign(onCitiesChange, { onPopulationGroupChange })
+  return Object.assign(onCitiesChange, { onPopulationGroupChange, onServiceChange })
 }
 
 describe('FilterPanel communities', () => {
@@ -79,5 +83,30 @@ describe('FilterPanel population', () => {
     renderPanel([], false)
     expect(screen.getByRole('radio', { name: 'Ages 5–17' })).toBeDisabled()
     expect(screen.getByText(/apply migration 003/)).toBeInTheDocument()
+  })
+})
+
+describe('FilterPanel service', () => {
+  function radiusLabels() {
+    const group = screen.getByRole('group', { name: 'Proximity radius' })
+    return Array.from(group.querySelectorAll('label')).map((l) => l.textContent)
+  }
+
+  it('switches the service', async () => {
+    const { onServiceChange } = renderPanel([])
+    expect(screen.getByRole('radio', { name: 'Schools' })).toBeChecked()
+    await userEvent.click(screen.getByRole('radio', { name: 'Libraries' }))
+    expect(onServiceChange).toHaveBeenCalledWith('library')
+  })
+
+  it('offers each service its own radii and type label', () => {
+    renderPanel([], true, 'library')
+    expect(radiusLabels()).toEqual(['Off', '½ mi', '1 mi', '2 mi'])
+    expect(screen.getByRole('combobox', { name: 'Library type' })).toBeInTheDocument()
+  })
+
+  it('keeps the school radii in metres', () => {
+    renderPanel([])
+    expect(radiusLabels()).toEqual(['Off', '500 m', '1 km', '1.5 km', '2 km'])
   })
 })

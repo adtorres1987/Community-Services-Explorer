@@ -3,7 +3,7 @@
 | Path | Committed | Contents |
 |---|---|---|
 | `raw/` | No | Original downloads, never modified |
-| `processed/study_area.gpkg` | Yes | Schools, community boundaries and census population units (EPSG:26911), ~3 MB |
+| `processed/study_area.gpkg` | Yes | Schools, libraries, community boundaries and census population units (EPSG:26911), ~3 MB |
 
 ## Getting the raw data
 
@@ -11,7 +11,7 @@
 python scripts/download_data.py
 ```
 
-Downloads the five sources into `raw/` (~1.2 GB) and verifies their SHA-256 checksums:
+Downloads the six sources into `raw/` (~1.2 GB) and verifies their SHA-256 checksums:
 
 - `raw/california-public-schools-2025-2026.geojson` — CDE California Public
   Schools 2025–26 ("No restrictions on public use")
@@ -22,8 +22,10 @@ Downloads the five sources into `raw/` (~1.2 GB) and verifies their SHA-256 chec
 - `raw/ca2020.dhc/` — Census 2020 Demographic and Housing Characteristics File for
   California (1.06 GB zip); only the geographic header `cageo2020.dhc` and segment
   `ca000062020.dhc` (table P12, sex by age) are extracted (~690 MB)
+- `raw/pls_fy2024/` — IMLS Public Libraries Survey FY 2024 (20 MB zip); only the
+  outlet and system CSV files are extracted
 
-The Census files are public domain. A checksum mismatch means the publisher
+The Census and IMLS files are public domain. A checksum mismatch means the publisher
 changed the file. Review the change, update `docs/data-sources.md`, then
 re-run with `--accept-changed`.
 

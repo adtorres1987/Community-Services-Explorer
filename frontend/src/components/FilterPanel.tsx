@@ -1,7 +1,14 @@
 import { POPULATION_GROUPS, type PopulationGroup } from '../features/facilities/coverage'
+import {
+  SERVICE_TYPES,
+  SERVICES,
+  type ServiceConfig,
+  type ServiceType,
+} from '../features/facilities/services'
 import type { CityProperties } from '../services/api'
 
 interface Props {
+  service: ServiceConfig
   places: CityProperties[]
   subtypes: string[]
   /** Selected places; empty means all */
@@ -11,21 +18,15 @@ interface Props {
   populationGroup: PopulationGroup
   /** False if the database has no age data (loaded before migration 003) */
   ageDataAvailable: boolean
+  onServiceChange: (service: ServiceType) => void
   onCitiesChange: (cities: string[]) => void
   onSubtypeChange: (subtype: string | null) => void
   onRadiusChange: (radius: number | null) => void
   onPopulationGroupChange: (group: PopulationGroup) => void
 }
 
-const RADIUS_OPTIONS: { value: number | null; label: string }[] = [
-  { value: null, label: 'Off' },
-  { value: 500, label: '500 m' },
-  { value: 1000, label: '1 km' },
-  { value: 1500, label: '1.5 km' },
-  { value: 2000, label: '2 km' },
-]
-
 export function FilterPanel({
+  service,
   places,
   subtypes,
   cities,
@@ -33,12 +34,14 @@ export function FilterPanel({
   radius,
   populationGroup,
   ageDataAvailable,
+  onServiceChange,
   onCitiesChange,
   onSubtypeChange,
   onRadiusChange,
   onPopulationGroupChange,
 }: Props) {
   const names = places.map((p) => p.name)
+  const radiusOptions = [{ value: null, label: 'Off' }, ...service.radii]
 
   function toggle(name: string, checked: boolean) {
     const next = checked ? [...cities, name] : cities.filter((c) => c !== name)
@@ -49,6 +52,23 @@ export function FilterPanel({
   return (
     <section className="panel" aria-labelledby="filters-heading">
       <h2 id="filters-heading">Filters</h2>
+
+      <fieldset className="field">
+        <legend>Service</legend>
+        <div className="segmented">
+          {SERVICE_TYPES.map((type) => (
+            <label key={type}>
+              <input
+                type="radio"
+                name="service"
+                checked={service.type === type}
+                onChange={() => onServiceChange(type)}
+              />
+              <span>{SERVICES[type].label}</span>
+            </label>
+          ))}
+        </div>
+      </fieldset>
 
       <fieldset className="field">
         <legend>Communities</legend>
@@ -85,7 +105,7 @@ export function FilterPanel({
       </fieldset>
 
       <label className="field">
-        <span>School type</span>
+        <span>{service.subtypeLabel}</span>
         <select value={subtype ?? ''} onChange={(e) => onSubtypeChange(e.target.value || null)}>
           <option value="">All types</option>
           {subtypes.map((name) => (
@@ -99,7 +119,7 @@ export function FilterPanel({
       <fieldset className="field">
         <legend>Proximity radius</legend>
         <div className="segmented">
-          {RADIUS_OPTIONS.map((option) => (
+          {radiusOptions.map((option) => (
             <label key={option.label}>
               <input
                 type="radio"

@@ -1,9 +1,11 @@
 """Build the study-area dataset: nine contiguous places in the San Bernardino Valley.
 
-Writes data/processed/study_area.gpkg (EPSG:26911) with three layers:
+Writes data/processed/study_area.gpkg (EPSG:26911) with four layers:
 
 - schools: active public schools inside a study place, plus "context" schools
-  within CONTEXT_DISTANCE_M of a study place that only contribute to coverage
+  within SCHOOL_CONTEXT_DISTANCE_M of a study place that only contribute to coverage
+- libraries: public library outlets (central and branch), with context libraries
+  within LIBRARY_CONTEXT_DISTANCE_M
 - city_boundaries: the study place boundaries with their 2020 population, total
   and aged 5-17
 - population_units: 2020 census blocks clipped to each place, with both
@@ -17,6 +19,7 @@ never modified.
 """
 from pathlib import Path
 import csv
+import string
 
 import geopandas as gpd
 import pandas as pd
@@ -29,6 +32,9 @@ BLOCKS_PATH = RAW / "tl_2020_06071_tabblock20/tl_2020_06071_tabblock20.shp"
 PL_GEO_PATH = RAW / "ca2020.pl/cageo2020.pl"
 DHC_GEO_PATH = RAW / "ca2020.dhc/cageo2020.dhc"
 DHC_P12_PATH = RAW / "ca2020.dhc/ca000062020.dhc"  # segment 6: tables P10, P11, P12, P12A
+PLS_DIR = RAW / "pls_fy2024/CSV"  # IMLS Public Libraries Survey FY 2024
+LIBRARY_OUTLETS_PATH = PLS_DIR / "pls_fy24_outlet_pud24i.csv"
+LIBRARY_SYSTEMS_PATH = PLS_DIR / "PLS_FY24_AE_pud24i.csv"
 OUTPUT_PATH = ROOT / "data/processed/study_area.gpkg"
 
 COUNTY_GEOCODE = "06071"  # San Bernardino County, CA
@@ -47,10 +53,21 @@ STUDY_PLACES = {
 
 SOURCE_CRS = "EPSG:3857"
 WORKING_CRS = "EPSG:26911"  # NAD83 / UTM zone 11N, metres
-# Largest radius offered by the API: schools this close to a city can cover part of it
-CONTEXT_DISTANCE_M = 2000
+# Largest radius offered for each service: facilities this close to a place can
+# cover part of it, so they are kept as context
+SCHOOL_CONTEXT_DISTANCE_M = 2000
+LIBRARY_CONTEXT_DISTANCE_M = 3200  # 2 miles
 # Block geometry tolerance: halves the committed file size, changes total area by ~0.003 %
 POPULATION_SIMPLIFY_M = 1.0
+
+# PLS outlet types kept: fixed service points. Bookmobiles (BS) and books-by-mail
+# (BM) have no fixed location.
+LIBRARY_OUTLET_TYPES = {"CE": "Central", "BR": "Branch"}
+LIBRARY_TEMPORARILY_CLOSED = "23"  # STATSTRU
+LIBRARY_COLUMNS = [
+    "library_id", "name", "outlet_type", "system", "address", "address_city", "zip",
+    "phone", "square_feet", "annual_hours", "weeks_open", "LIBNAME", "LATITUDE", "LONGITUD",
+]
 
 KEEP_COLUMNS = [
     "CDSCode", "SchoolName", "SchoolType", "SchoolLevel", "GradeLow",
@@ -113,18 +130,103 @@ def select_schools(schools: gpd.GeoDataFrame, cities: gpd.GeoDataFrame) -> gpd.G
         raise ValueError("Invalid school geometries; review before continuing")
 
     active = active[KEEP_COLUMNS + ["geometry"]].to_crs(WORKING_CRS)
-    joined = gpd.sjoin(active, cities[["city", "geometry"]], how="left", predicate="within")
-    if joined.index.duplicated().any():
-        raise ValueError("A school falls within more than one study city")
-    active = active.assign(study_city=joined["city"].astype(object).where(joined["city"].notna(), None))
-
-    in_study_area = active["study_city"].notna()
-    near = active.geometry.distance(cities.union_all()) <= CONTEXT_DISTANCE_M
-    selected = active[in_study_area | near].copy()
-    selected["in_study_area"] = selected["study_city"].notna()
+    selected = assign_to_places(active, cities, SCHOOL_CONTEXT_DISTANCE_M)
     # Exclusively virtual schools are administrative addresses, not service locations
     selected["proximity_eligible"] = selected["Virtual"] != "V"
+    return selected
+
+
+def assign_to_places(
+    facilities: gpd.GeoDataFrame, cities: gpd.GeoDataFrame, context_distance_m: float
+) -> gpd.GeoDataFrame:
+    """Facilities inside a study place, plus context facilities near one.
+
+    Adds study_city (the place whose boundary contains the facility, or None)
+    and in_study_area. Context facilities are within context_distance_m of a
+    place, in any county, and only contribute to proximity coverage.
+    """
+    joined = gpd.sjoin(facilities, cities[["city", "geometry"]], how="left", predicate="within")
+    if joined.index.duplicated().any():
+        raise ValueError("A facility falls within more than one study place")
+    facilities = facilities.assign(
+        study_city=joined["city"].astype(object).where(joined["city"].notna(), None)
+    )
+    in_study_area = facilities["study_city"].notna()
+    near = facilities.geometry.distance(cities.union_all()) <= context_distance_m
+    selected = facilities[in_study_area | near].copy()
+    selected["in_study_area"] = selected["study_city"].notna()
     return selected.reset_index(drop=True)
+
+
+LOWERCASE_WORDS = {"and", "of", "for", "the", "at"}
+
+
+def display_case(value):
+    """PLS text is upper case: "656 N. 9TH ST." -> "656 N. 9th St."."""
+    if not isinstance(value, str):
+        return value
+    words = string.capwords(value).split(" ")
+    return " ".join(
+        word.lower() if i > 0 and word.lower() in LOWERCASE_WORDS else word
+        for i, word in enumerate(words)
+    )
+
+
+def pls_number(series: pd.Series) -> pd.Series:
+    """PLS numeric fields use negative codes (-1, -3, -9) for missing values."""
+    values = pd.to_numeric(series, errors="coerce")
+    return values.where(values >= 0).astype("Int64")
+
+
+def select_libraries(
+    outlets: pd.DataFrame, systems: pd.DataFrame, cities: gpd.GeoDataFrame
+) -> gpd.GeoDataFrame:
+    """Public library outlets inside a study place, plus context libraries near one.
+
+    Keeps California outlets of systems that meet the FSCS public library
+    definition (C_FSCS = Y; excludes the county law libraries), central and branch
+    outlets only, and not temporarily closed. All are proximity eligible.
+    """
+    if outlets[["FSCSKEY", "FSCS_SEQ"]].duplicated().any():
+        raise ValueError("Duplicate FSCSKEY/FSCS_SEQ values in the PLS outlet file")
+    keep = (
+        (outlets["STABR"] == "CA")
+        & (outlets["C_FSCS"] == "Y")
+        & outlets["C_OUT_TY"].isin(LIBRARY_OUTLET_TYPES)
+        & (outlets["STATSTRU"] != LIBRARY_TEMPORARILY_CLOSED)
+    )
+    libraries = outlets[keep].copy()
+    coordinates = libraries[["LONGITUD", "LATITUDE"]].apply(pd.to_numeric, errors="coerce")
+    if coordinates.isna().any().any():
+        raise ValueError("PLS outlets without coordinates; review before continuing")
+
+    names = systems.drop_duplicates("FSCSKEY").set_index("FSCSKEY")["LIBNAME"]
+    libraries = libraries.assign(
+        library_id=libraries["FSCSKEY"] + "-" + libraries["FSCS_SEQ"],
+        name=libraries["LIBNAME"].map(display_case),
+        outlet_type=libraries["C_OUT_TY"].map(LIBRARY_OUTLET_TYPES),
+        system=libraries["FSCSKEY"].map(names).map(display_case),
+        address=libraries["ADDRESS"].map(display_case),
+        address_city=libraries["CITY"].map(display_case),
+        zip=libraries["ZIP"],
+        phone=libraries["PHONE"],
+        square_feet=pls_number(libraries["SQ_FEET"]),
+        annual_hours=pls_number(libraries["HOURS"]),
+        weeks_open=pls_number(libraries["WKS_OPEN"]),
+        LATITUDE=coordinates["LATITUDE"],
+        LONGITUD=coordinates["LONGITUD"],
+    )
+    if libraries["system"].isna().any():
+        raise ValueError("PLS outlets without a matching library system")
+    # PLS coordinates are geocoded latitude/longitude (WGS84)
+    libraries = gpd.GeoDataFrame(
+        libraries[LIBRARY_COLUMNS],
+        geometry=gpd.points_from_xy(coordinates["LONGITUD"], coordinates["LATITUDE"]),
+        crs="EPSG:4326",
+    ).to_crs(WORKING_CRS)
+    selected = assign_to_places(libraries, cities, LIBRARY_CONTEXT_DISTANCE_M)
+    selected["proximity_eligible"] = True
+    return selected
 
 
 def read_block_population(path: Path, county_geocode: str = COUNTY_GEOCODE) -> pd.DataFrame:
@@ -192,7 +294,10 @@ def apportion_population(
 
 
 def main() -> None:
-    for path in (SCHOOLS_PATH, PLACES_PATH, BLOCKS_PATH, PL_GEO_PATH, DHC_GEO_PATH, DHC_P12_PATH):
+    for path in (
+        SCHOOLS_PATH, PLACES_PATH, BLOCKS_PATH, PL_GEO_PATH, DHC_GEO_PATH, DHC_P12_PATH,
+        LIBRARY_OUTLETS_PATH, LIBRARY_SYSTEMS_PATH,
+    ):
         if not path.exists():
             raise FileNotFoundError(f"{path} — run scripts/download_data.py first")
 
@@ -204,6 +309,16 @@ def main() -> None:
     study = selected[selected["in_study_area"]]
     print("Schools in study cities:", len(study), "| context schools:", (~selected["in_study_area"]).sum())
     print("Not proximity eligible (Virtual = V):", (~selected["proximity_eligible"]).sum())
+
+    libraries = select_libraries(
+        pd.read_csv(LIBRARY_OUTLETS_PATH, dtype=str, encoding="latin-1"),
+        pd.read_csv(LIBRARY_SYSTEMS_PATH, dtype=str, encoding="latin-1"),
+        cities,
+    )
+    print(
+        "Libraries in study places:", libraries["in_study_area"].sum(),
+        "| context libraries:", (~libraries["in_study_area"]).sum(),
+    )
 
     population = read_block_population(PL_GEO_PATH).merge(
         read_block_age_5_17(DHC_GEO_PATH, DHC_P12_PATH), on="GEOID20", how="outer", validate="1:1"
@@ -223,14 +338,18 @@ def main() -> None:
         cities[column] = cities["city"].map(totals).fillna(0).round().astype(int)
     print("Population in study cities:", cities["population"].sum(), "| aged 5-17:", cities["population_5_17"].sum())
 
-    summary = cities.set_index("city")[["population", "population_5_17"]].join(
-        study.groupby("study_city").size().rename("schools")
+    summary = (
+        cities.set_index("city")[["population", "population_5_17"]]
+        .join(study.groupby("study_city").size().rename("schools"))
+        .join(libraries[libraries["in_study_area"]].groupby("study_city").size().rename("libraries"))
+        .fillna({"libraries": 0})
     )
     print(summary.sort_values("population", ascending=False).to_string())
 
     OUTPUT_PATH.parent.mkdir(parents=True, exist_ok=True)
     OUTPUT_PATH.unlink(missing_ok=True)
     selected.to_file(OUTPUT_PATH, layer="schools", driver="GPKG")
+    libraries.to_file(OUTPUT_PATH, layer="libraries", driver="GPKG")
     cities.to_file(OUTPUT_PATH, layer="city_boundaries", driver="GPKG")
     # No GeoPackage spatial index: PostGIS builds its own, and it keeps the committed file small
     units.to_file(

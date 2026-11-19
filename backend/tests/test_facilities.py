@@ -7,8 +7,26 @@ def test_list_all_facilities(client):
     assert response.status_code == 200
     body = response.json()
     assert body["type"] == "FeatureCollection"
-    assert len(body["features"]) == 205
-    assert sum(f["properties"]["in_study_area"] for f in body["features"]) == 173
+    assert len(body["features"]) == 225
+    assert sum(f["properties"]["in_study_area"] for f in body["features"]) == 187
+
+
+def test_list_facilities_by_type(client):
+    for facility_type, total, in_study_area in (("school", 205, 173), ("library", 20, 14)):
+        features = client.get("/facilities", params={"facility_type": facility_type}).json()["features"]
+        assert len(features) == total
+        assert sum(f["properties"]["in_study_area"] for f in features) == in_study_area
+        assert {f["properties"]["facility_type"] for f in features} == {facility_type}
+
+
+def test_library_properties(client):
+    features = client.get("/facilities", params={"facility_type": "library"}).json()["features"]
+    smiley = by_name(features, "A. K. Smiley Public Library")
+    assert (smiley["city"], smiley["facility_subtype"]) == ("Redlands", "Central")
+    assert smiley["attributes"]["LibrarySystem"] == "A. K. Smiley Public Library"
+    assert smiley["attributes"]["SquareFeet"] == 64636
+    calimesa = by_name(features, "Calimesa Library")
+    assert (calimesa["city"], calimesa["in_study_area"]) == (None, False)
 
 
 def test_context_facilities_have_no_study_city(client):
@@ -35,8 +53,9 @@ def test_city_is_assigned_by_boundary_not_address(client):
 
 def test_filter_by_city(client):
     features = client.get("/facilities", params={"city": "Yucaipa"}).json()["features"]
-    assert len(features) == 13
+    assert len(features) == 14
     assert {f["properties"]["city"] for f in features} == {"Yucaipa"}
+    assert sum(f["properties"]["facility_type"] == "library" for f in features) == 1
 
 
 def test_filter_by_subtype(client):

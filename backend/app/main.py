@@ -25,9 +25,10 @@ app = FastAPI(
     title="Community Services Explorer API",
     version="0.1.0",
     description=(
-        "Public schools in nine San Bernardino Valley communities (Colton, Grand Terrace, "
-        "Highland, Loma Linda, Mentone, Redlands, Rialto, San Bernardino, Yucaipa), "
-        "California, with proximity coverage by area and 2020 population. "
+        "Public schools and public libraries in nine San Bernardino Valley communities "
+        "(Colton, Grand Terrace, Highland, Loma Linda, Mentone, Redlands, Rialto, "
+        "San Bernardino, Yucaipa), California, with proximity coverage by area and "
+        "2020 population (total and aged 5-17). "
         "Geometries are GeoJSON in EPSG:4326; distances are straight-line metres "
         "computed in EPSG:26911."
     ),

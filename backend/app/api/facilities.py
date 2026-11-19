@@ -14,9 +14,9 @@ router = APIRouter(prefix="/facilities", tags=["facilities"])
 @router.get("", response_model=FacilityCollection)
 def list_facilities(
     conn: Annotated[Connection, Depends(get_connection)],
-    city: Annotated[str | None, Query(description="Address city, e.g. Redlands")] = None,
-    facility_type: Annotated[str | None, Query(description="e.g. school")] = None,
-    facility_subtype: Annotated[str | None, Query(description="e.g. Elementary")] = None,
+    city: Annotated[str | None, Query(description="Study place, e.g. Redlands")] = None,
+    facility_type: Annotated[str | None, Query(description="school or library")] = None,
+    facility_subtype: Annotated[str | None, Query(description="e.g. Elementary, Branch")] = None,
 ):
     """Facilities as a GeoJSON FeatureCollection (EPSG:4326)."""
     if city is not None and not cities_service.city_exists(conn, city):
