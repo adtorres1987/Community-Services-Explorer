@@ -26,6 +26,10 @@ interface Props {
 
 const number = new Intl.NumberFormat('en-US')
 
+function capitalize(text: string) {
+  return text.charAt(0).toUpperCase() + text.slice(1)
+}
+
 export function StatisticsPanel({
   service,
   places,
@@ -57,14 +61,14 @@ export function StatisticsPanel({
         {proximity.loading && <span className="muted"> · calculating…</span>}
       </h2>
       <p className="muted">
-        {subtype ? `${subtype} ${service.plural}` : service.allSubtypes}
+        {subtype ? service.describeSubtype(subtype) : service.allSubtypes}
       </p>
 
       <table className="stats-table">
         <thead>
           <tr>
             <th scope="col">Community</th>
-            <th scope="col">{service.label}</th>
+            <th scope="col">{capitalize(service.plural)}</th>
             {option ? (
               <>
                 <th scope="col">
@@ -87,7 +91,7 @@ export function StatisticsPanel({
                   {place.name}
                   {place.place_type === 'CDP' && <span className="tag">CDP</span>}
                 </th>
-                <td>{countIn(place.name)}</td>
+                <td>{number.format(countIn(place.name))}</td>
                 {showCoverage ? (
                   <>
                     <td>{pct != null ? `${pct.toFixed(1)}%` : '—'}</td>
@@ -105,7 +109,7 @@ export function StatisticsPanel({
           <tfoot>
             <tr>
               <th scope="row">{totalLabel}</th>
-              <td>{totalCount}</td>
+              <td>{number.format(totalCount)}</td>
               {showCoverage ? (
                 <>
                   <td>{results.length ? percent(summary.coveredPopulation, summary.population) : '—'}</td>
@@ -137,7 +141,7 @@ export function StatisticsPanel({
           {number.format(summary.coveredPopulation)} of {number.format(summary.population)} {group.noun}{' '}
           ({percent(summary.coveredPopulation, summary.population)}) and{' '}
           {summary.coveredAreaKm2.toFixed(2)} of {summary.areaKm2.toFixed(2)} km² are within{' '}
-          {option.long} of a {service.singular}. {summary.contributing}{' '}
+          {option.long} of a {service.singular}. {number.format(summary.contributing)}{' '}
           {summary.contributing === 1 ? service.singular : service.plural} contribute
           {summary.contributing === 1 ? 's' : ''}
           {outside > 0 &&

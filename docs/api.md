@@ -29,7 +29,7 @@ All geometries are GeoJSON in **EPSG:4326**. Distances are computed in EPSG:2691
 | GET | `/cities` | — | FeatureCollection of the nine study places with type, area, 2020 population (total and aged 5–17) and facility counts by type |
 | GET | `/analysis/proximity` | `radius_m` (100–3200, required), `city`, `facility_type`, `facility_subtype` | Coverage per place, by area, population and population aged 5–17 |
 
-`facility_type` is `school` or `library`. Without it, `/facilities` returns
+`facility_type` is `school`, `library` or `transit`. Without it, `/facilities` returns
 every type and `/analysis/proximity` treats all types as one service, which is
 rarely meaningful: the frontend always sends it.
 
@@ -41,7 +41,8 @@ The API keeps the name `city` for a study place; Mentone is a CDP, not a city.
 filter uses it. `address_city` is the mailing address from the source and can
 differ. Context facilities (`in_study_area: false`, `city: null`) are within
 the largest radius offered for their service (2 km for schools, 3.2 km for
-libraries) of the study area and only contribute to coverage.
+libraries, 800 m for transit) of the study area and only contribute to coverage.
+Transit stops have no mailing address (`address_city: null`).
 
 ```json
 {
@@ -72,6 +73,27 @@ outlet details from the Public Libraries Survey:
   }
 }
 ```
+
+Transit stops (`facility_subtype` is the service level: `Frequent bus (15 min or
+better)`, `Bus every 20–30 min`, `Bus less often`, `Rail`, or `No weekday service`)
+carry their schedule summary:
+
+```json
+{
+  "name": "San Bernardino - Downtown",
+  "facility_type": "transit",
+  "facility_subtype": "Rail",
+  "city": "San Bernardino",
+  "address_city": null,
+  "attributes": {
+    "Agency": "Metrolink", "Mode": "Rail", "Routes": "IE-OC Line, SB Line",
+    "WeekdayDepartures": 86, "PeakDeparturesPerHour": 5.0, "WheelchairBoarding": null
+  }
+}
+```
+
+Responses are gzip-compressed when the client accepts it (`/facilities` with
+every type is ~690 KB, ~46 KB compressed).
 
 ### `/cities`
 

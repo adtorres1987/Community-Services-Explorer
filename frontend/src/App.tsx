@@ -79,7 +79,10 @@ export default function App() {
     <div className="app">
       <header className="app-header">
         <h1>Community Services Explorer</h1>
-        <p>Public schools and libraries in nine San Bernardino Valley communities, California</p>
+        <p>
+          Public schools, libraries and transit stops in nine San Bernardino Valley communities,
+          California
+        </p>
       </header>
 
       <main className="layout">

@@ -119,10 +119,10 @@ export function MapView({ service, cities, facilities, focusedIds, coverage, sel
           <CircleMarker
             key={facility.properties.id}
             center={[lat, lon]}
-            radius={focused ? 7 : 5}
+            radius={focused ? service.marker.focused : service.marker.faded}
             pathOptions={{
               color: eligible ? '#ffffff' : color,
-              weight: eligible ? 1.5 : 2.5,
+              weight: (eligible ? 1.5 : 2.5) * (service.marker.focused < 6 ? 0.7 : 1),
               opacity: focused ? 1 : 0.5,
               fillColor: color,
               fillOpacity: eligible ? (focused ? 0.95 : 0.35) : 0,

@@ -33,21 +33,21 @@ one-shot `loader` service.
 All geometries use **SRID 26911** (NAD83 / UTM zone 11N, metres). The API
 transforms to EPSG:4326 for GeoJSON output.
 
-**`facilities`** — one row per facility, generic across service types (schools and libraries).
+**`facilities`** — one row per facility, generic across service types (schools, libraries and transit stops).
 
 | Column | Type | Notes |
 |---|---|---|
 | `id` | `BIGINT` identity | Internal id |
-| `source_id` | `TEXT` | `CDSCode` for schools, `FSCSKEY-FSCS_SEQ` for libraries; unique with `source_name` |
-| `source_name` | `TEXT` | `cde_public_schools_2025_26` or `imls_pls_fy2024_outlets` |
+| `source_id` | `TEXT` | `CDSCode` for schools, `FSCSKEY-FSCS_SEQ` for libraries, `omnitrans:<stop_id>` / `metrolink:<stop_id>` for transit; unique with `source_name` |
+| `source_name` | `TEXT` | `cde_public_schools_2025_26`, `imls_pls_fy2024_outlets` or `gtfs_omnitrans_metrolink` |
 | `name` | `TEXT` | |
-| `facility_type` | `TEXT` | `school` or `library` |
-| `facility_subtype` | `TEXT` | CDE `SchoolType` (Elementary, High, …); `Central` or `Branch` for libraries |
+| `facility_type` | `TEXT` | `school`, `library` or `transit` |
+| `facility_subtype` | `TEXT` | CDE `SchoolType` (Elementary, High, …); `Central` or `Branch` for libraries; service level for transit |
 | `city` | `TEXT` | Study place whose boundary contains the facility; `NULL` for context facilities |
-| `address_city` | `TEXT` | Mailing-address city from the source |
+| `address_city` | `TEXT` | Mailing-address city from the source; `NULL` for transit stops |
 | `in_study_area` | `BOOLEAN` | `false` for context facilities (within 2 km for schools, 3.2 km for libraries; coverage only); `CHECK (in_study_area = (city IS NOT NULL))` |
-| `proximity_eligible` | `BOOLEAN` | `false` for exclusively virtual schools; always `true` for libraries |
-| `attributes` | `JSONB` | Source-specific fields: schools (level, grades, charter, district, address, county, website, enrolment); libraries (system, address, phone, square feet, annual hours, weeks open) |
+| `proximity_eligible` | `BOOLEAN` | `false` for exclusively virtual schools and stops without weekday service; always `true` for libraries |
+| `attributes` | `JSONB` | Source-specific fields: schools (level, grades, charter, district, address, county, website, enrolment); libraries (system, address, phone, square feet, annual hours, weeks open); transit (agency, mode, routes, weekday departures, AM-peak departures per hour, wheelchair boarding) |
 | `geom` | `geometry(Point, 26911)` | GiST index |
 
 **`city_boundaries`** — one row per study place: `geoid`, `name`, `place_type`
@@ -111,12 +111,32 @@ libraries up to 3.2 km outside the study area; query 7c):
   An independent GeoPandas calculation gives identical values for area, both
   populations and contributing libraries at all three radii (verified 2026-11-18).
 
+Transit coverage (query 7d): share of residents within ¼ and ½ mile of any
+stop with weekday service, and of a frequent bus stop (15 min or better):
+
+| Place | Any stop ¼ mi | Any stop ½ mi | Frequent ¼ mi | Frequent ½ mi |
+|---|---|---|---|---|
+| Colton | 51.0 % | 81.8 % | 18.3 % | 37.6 % |
+| Grand Terrace | 28.2 % | 66.0 % | 0.0 % | 0.4 % |
+| Highland | 61.8 % | 83.6 % | 14.7 % | 33.1 % |
+| Loma Linda | 55.9 % | 90.3 % | 11.6 % | 33.5 % |
+| Mentone | 44.9 % | 81.9 % | 0.0 % | 0.1 % |
+| Redlands | 43.0 % | 71.2 % | 0.3 % | 4.8 % |
+| Rialto | 68.4 % | 98.6 % | 12.2 % | 27.5 % |
+| San Bernardino | 65.9 % | 89.2 % | 32.8 % | 60.1 % |
+| Yucaipa | 41.6 % | 69.7 % | 1.4 % | 7.6 % |
+
+  An independent GeoPandas calculation gives identical values for area, both
+  populations and contributing stops for all stops, frequent bus stops and rail
+  stations at both radii (verified 2026-11-18).
+
 ## Performance
 
 `/analysis/proximity` for all nine places runs in 0.4–0.7 s on a laptop
 (buffer union, clip to boundaries, then area-weighted sums over ~6,800
 population units using the GiST indexes); the response is 160–235 KB with
-coverage geometry. The covered share of each block is computed once in a
+coverage geometry (~70 KB gzip-compressed). Transit, with ~1,250 stops, takes
+about 0.5 s. The covered share of each block is computed once in a
 `MATERIALIZED` CTE and reused for both populations; without it PostgreSQL
 inlines the expression into each sum and the query is ~50 % slower.
 

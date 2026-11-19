@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
-import { makeFacility, makeLibrary } from '../test/fixtures'
+import { makeFacility, makeLibrary, makeStop } from '../test/fixtures'
 import { FacilityPopup } from './FacilityPopup'
 
 describe('FacilityPopup', () => {
@@ -64,5 +64,28 @@ describe('FacilityPopup', () => {
     const library = makeLibrary({ name: 'Calimesa Library', city: null, address_city: 'Calimesa', in_study_area: false })
     render(<FacilityPopup facility={library.properties} />)
     expect(screen.getByText(/not included in library counts/)).toBeInTheDocument()
+  })
+
+  it('shows transit service without an address note', () => {
+    render(<FacilityPopup facility={makeStop().properties} />)
+    expect(screen.getByText('Rail station · Rail')).toBeInTheDocument()
+    expect(screen.getByText('Routes').nextSibling).toHaveTextContent('IE-OC Line, SB Line')
+    expect(screen.getByText('86 departures')).toBeInTheDocument()
+    expect(screen.getByText('5 per hour (7–9 am)')).toBeInTheDocument()
+    expect(screen.getByText('No information')).toBeInTheDocument()
+    // GTFS has no mailing address, so no address mismatch note
+    expect(screen.queryByText(/mailing address/)).not.toBeInTheDocument()
+  })
+
+  it('explains a stop without weekday service', () => {
+    const stop = makeStop({
+      name: 'Main @ 1st',
+      facility_subtype: 'No weekday service',
+      proximity_eligible: false,
+      attributes: { Agency: 'Omnitrans', Mode: 'Bus', Routes: '', WeekdayDepartures: 0, PeakDeparturesPerHour: 0 },
+    })
+    render(<FacilityPopup facility={stop.properties} />)
+    expect(screen.getByText('Bus stop · No weekday service')).toBeInTheDocument()
+    expect(screen.getByText(/stop is excluded from the proximity analysis/)).toBeInTheDocument()
   })
 })

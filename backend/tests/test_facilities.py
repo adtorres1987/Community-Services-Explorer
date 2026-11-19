@@ -7,12 +7,14 @@ def test_list_all_facilities(client):
     assert response.status_code == 200
     body = response.json()
     assert body["type"] == "FeatureCollection"
-    assert len(body["features"]) == 225
-    assert sum(f["properties"]["in_study_area"] for f in body["features"]) == 187
+    assert len(body["features"]) == 1474
+    assert sum(f["properties"]["in_study_area"] for f in body["features"]) == 1349
 
 
 def test_list_facilities_by_type(client):
-    for facility_type, total, in_study_area in (("school", 205, 173), ("library", 20, 14)):
+    for facility_type, total, in_study_area in (
+        ("school", 205, 173), ("library", 20, 14), ("transit", 1249, 1162),
+    ):
         features = client.get("/facilities", params={"facility_type": facility_type}).json()["features"]
         assert len(features) == total
         assert sum(f["properties"]["in_study_area"] for f in features) == in_study_area
@@ -27,6 +29,18 @@ def test_library_properties(client):
     assert smiley["attributes"]["SquareFeet"] == 64636
     calimesa = by_name(features, "Calimesa Library")
     assert (calimesa["city"], calimesa["in_study_area"]) == (None, False)
+
+
+def test_transit_stop_properties(client):
+    features = client.get(
+        "/facilities", params={"facility_type": "transit", "facility_subtype": "Rail"}
+    ).json()["features"]
+    assert len(features) == 7
+    downtown = by_name(features, "San Bernardino - Downtown")
+    assert downtown["city"] == "San Bernardino"
+    assert downtown["address_city"] is None
+    assert downtown["attributes"]["Routes"] == "IE-OC Line, SB Line"
+    assert downtown["attributes"]["PeakDeparturesPerHour"] == 5.0
 
 
 def test_context_facilities_have_no_study_city(client):
@@ -53,9 +67,10 @@ def test_city_is_assigned_by_boundary_not_address(client):
 
 def test_filter_by_city(client):
     features = client.get("/facilities", params={"city": "Yucaipa"}).json()["features"]
-    assert len(features) == 14
+    assert len(features) == 74
     assert {f["properties"]["city"] for f in features} == {"Yucaipa"}
-    assert sum(f["properties"]["facility_type"] == "library" for f in features) == 1
+    types = [f["properties"]["facility_type"] for f in features]
+    assert (types.count("school"), types.count("library"), types.count("transit")) == (13, 1, 60)
 
 
 def test_filter_by_subtype(client):

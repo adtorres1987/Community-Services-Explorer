@@ -77,9 +77,23 @@ Mentone (CDP, no incorporada), Redlands, Rialto, San Bernardino y Yucaipa.
     API ampliado a 3.200 m.
 -   Sin migración: la tabla `facilities` ya era genérica. El pipeline
     comparte `assign_to_places` y el frontend usa un registro de servicios.
--   Pendientes de la fase: transporte (GTFS de Omnitrans), salud (CDPH) y
-    parques (fuente con licencia por confirmar).
 -   Desarrollado en la rama `feature/library-services`.
+
+### Fase 7 (en curso): transporte público
+
+-   Fuentes: GTFS de Omnitrans (bus y sbX) y de Metrolink (incluye el
+    Arrow a Redlands), copias archivadas en la Mobility Database para que
+    la URL y el checksum no cambien con cada temporada de servicio.
+-   1.162 paradas en el área (1.155 de bus y 7 estaciones de tren) y 87 de
+    contexto (a menos de 800 m).
+-   Clasificación por frecuencia en hora punta (7–9 h, miércoles 16 de
+    septiembre de 2026): bus frecuente (cada 15 min o mejor), cada
+    20–30 min, menos frecuente, y tren.
+-   Radios de ¼ y ½ milla. A ¼ de milla de cualquier parada vive el 58,2 %
+    de los residentes; de una parada de bus frecuente, solo el 17,6 %.
+-   Pendientes de la fase: salud (CDPH) y parques (fuente con licencia por
+    confirmar).
+-   Desarrollado en la rama `feature/transit-stops`.
 
 Documentación técnica: `README.md` y `docs/`.
 
@@ -555,7 +569,7 @@ Incorporar, después de verificar fuentes y licencias:
 -   Bibliotecas. *(Hecho: IMLS PLS FY 2024.)*
 -   Centros comunitarios.
 -   Hospitales y clínicas.
--   Transporte público.
+-   Transporte público. *(Hecho: GTFS de Omnitrans y Metrolink.)*
 
 Cada fuente deberá tener fecha, procedencia, licencia y descripción de
 sus limitaciones.

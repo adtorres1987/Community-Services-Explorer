@@ -33,6 +33,17 @@ LIBRARIES_BY_PLACE = {
 }
 
 
+TRANSIT_STOPS_BY_PLACE = {
+    "Colton": 93, "Grand Terrace": 13, "Highland": 71, "Loma Linda": 55, "Mentone": 20,
+    "Redlands": 99, "Rialto": 197, "San Bernardino": 554, "Yucaipa": 60,
+}
+
+
+@pytest.fixture(scope="module")
+def transit_stops():
+    return gpd.read_file(ps.OUTPUT_PATH, layer="transit_stops")
+
+
 @pytest.fixture(scope="module")
 def libraries():
     return gpd.read_file(ps.OUTPUT_PATH, layer="libraries")
@@ -53,6 +64,7 @@ def test_layers():
     assert layers == {
         "schools": "Point",
         "libraries": "Point",
+        "transit_stops": "Point",
         "city_boundaries": "MultiPolygon",
         "population_units": "MultiPolygon",
     }
@@ -90,6 +102,27 @@ def test_library_counts(libraries, cities):
     context = libraries[~libraries["in_study_area"]]
     distance = context.geometry.distance(cities.union_all())
     assert ((distance > 0) & (distance <= ps.LIBRARY_CONTEXT_DISTANCE_M)).all()
+
+
+def test_transit_stops(transit_stops, cities):
+    study = transit_stops[transit_stops["in_study_area"]]
+    assert study.groupby("study_city").size().to_dict() == TRANSIT_STOPS_BY_PLACE
+    assert study["service_class"].value_counts().to_dict() == {
+        ps.TRANSIT_INFREQUENT: 472, ps.TRANSIT_MEDIUM: 445, ps.TRANSIT_FREQUENT: 238, ps.TRANSIT_RAIL: 7,
+    }
+    assert len(transit_stops) == 1249
+    assert transit_stops["stop_key"].is_unique
+    assert transit_stops["proximity_eligible"].all()
+    assert set(study.loc[study["mode"] == "Rail", "name"]) == {
+        "Redlands - Downtown", "Redlands - Esri", "Redlands - University", "Rialto",
+        "San Bernardino - Downtown", "San Bernardino - Tippecanoe", "San Bernardino Depot",
+    }
+    context = transit_stops[~transit_stops["in_study_area"]]
+    distance = context.geometry.distance(cities.union_all())
+    assert ((distance > 0) & (distance <= ps.TRANSIT_CONTEXT_DISTANCE_M)).all()
+    wgs84 = transit_stops.to_crs("EPSG:4326").geometry
+    assert ((wgs84.x - transit_stops["stop_lon"]).abs() < 1e-5).all()
+    assert ((wgs84.y - transit_stops["stop_lat"]).abs() < 1e-5).all()
 
 
 def test_library_points_match_source_coordinates(libraries):

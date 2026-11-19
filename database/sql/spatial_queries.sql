@@ -141,6 +141,40 @@ LEFT JOIN population_units u ON u.city = c.name AND ST_Intersects(u.geom, c.geom
 GROUP BY c.name, c.population, c.radius_m
 ORDER BY c.name, c.radius_m;
 
+\echo '7d. Transit: share of residents within 1/4 and 1/2 mile (400 m, 800 m) of any stop and of a frequent bus stop'
+-- Frequent: 4+ departures per hour at the stop, 7-9 am on the reference weekday (pipeline classification).
+-- MATERIALIZED: otherwise PostgreSQL inlines the CTE and rebuilds the union of
+-- hundreds of stop buffers for every census block it is joined to.
+WITH coverage AS MATERIALIZED (
+    SELECT
+        b.name,
+        b.population,
+        r.radius_m,
+        k.stops,
+        ST_Intersection(
+            b.geom,
+            (SELECT ST_Union(ST_Buffer(f.geom, r.radius_m))
+             FROM facilities f
+             WHERE f.facility_type = 'transit' AND f.proximity_eligible
+               AND (k.stops = 'all' OR f.facility_subtype = 'Frequent bus (15 min or better)')
+               AND ST_DWithin(f.geom, b.geom, r.radius_m))
+        ) AS geom
+    FROM city_boundaries b
+    CROSS JOIN (VALUES (400), (800)) AS r(radius_m)
+    CROSS JOIN (VALUES ('all'), ('frequent')) AS k(stops)
+)
+SELECT
+    c.name AS place,
+    c.radius_m,
+    round((100 * coalesce(sum(u.population * ST_Area(ST_Intersection(u.geom, c.geom)) / ST_Area(u.geom))
+        FILTER (WHERE c.stops = 'all'), 0) / c.population)::numeric, 1) AS pct_any_stop,
+    round((100 * coalesce(sum(u.population * ST_Area(ST_Intersection(u.geom, c.geom)) / ST_Area(u.geom))
+        FILTER (WHERE c.stops = 'frequent'), 0) / c.population)::numeric, 1) AS pct_frequent_stop
+FROM coverage c
+LEFT JOIN population_units u ON u.city = c.name AND ST_Intersects(u.geom, c.geom)
+GROUP BY c.name, c.population, c.radius_m
+ORDER BY c.name, c.radius_m;
+
 \echo '8. ST_Transform: GeoJSON output in EPSG:4326 (as the API will return it)'
 SELECT name, ST_AsGeoJSON(ST_Transform(geom, 4326), 6) AS geojson
 FROM facilities

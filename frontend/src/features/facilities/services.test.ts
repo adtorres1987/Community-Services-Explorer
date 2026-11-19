@@ -11,6 +11,8 @@ describe('closestRadius', () => {
     expect(closestRadius(2000, SERVICES.library)).toBe(1600)
     expect(closestRadius(3200, SERVICES.school)).toBe(2000)
     expect(closestRadius(800, SERVICES.school)).toBe(1000)
+    expect(closestRadius(3200, SERVICES.transit)).toBe(800)
+    expect(closestRadius(500, SERVICES.transit)).toBe(400)
   })
 })
 
@@ -22,6 +24,15 @@ describe('radiusOption', () => {
 
   it('falls back to metres for an unlisted radius', () => {
     expect(radiusOption(SERVICES.school, 750).long).toBe('750 m')
+  })
+})
+
+describe('transit', () => {
+  it('colours stops by service level and greys out stops without service', () => {
+    expect(SERVICES.transit.color('Rail')).toBe('#CC79A7')
+    expect(SERVICES.transit.color('Frequent bus (15 min or better)')).toBe('#009E73')
+    expect(SERVICES.transit.color('No weekday service')).toBe('#6B6B6B')
+    expect(SERVICES.transit.excluded?.legend).toMatch(/No weekday service/)
   })
 })
 

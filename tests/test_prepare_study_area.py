@@ -297,3 +297,115 @@ def test_display_case_keeps_short_words_lower_case():
     assert ps.display_case("MENTONE SENIOR CENTER AND LIBRARY") == "Mentone Senior Center and Library"
     assert ps.display_case("656 N. 9TH ST.") == "656 N. 9th St."
     assert ps.display_case(None) is None
+
+
+def make_gtfs(stops, stop_times, routes=None, calendar=None, calendar_dates=None):
+    """Synthetic GTFS tables (text, as read_gtfs returns them)."""
+    routes = routes or [
+        {"route_id": "r1", "route_short_name": "15", "route_long_name": "Fifteen", "route_type": "3"},
+        {"route_id": "r2", "route_short_name": "", "route_long_name": "sbX Green Line", "route_type": "3"},
+        {"route_id": "dr", "route_short_name": "OR", "route_long_name": "OmniRide", "route_type": "715"},
+    ]
+    calendar = calendar or [
+        {"service_id": "wk", "monday": "1", "tuesday": "1", "wednesday": "1", "thursday": "1",
+         "friday": "1", "saturday": "0", "sunday": "0", "start_date": "20260801", "end_date": "20261231"},
+        {"service_id": "sat", "monday": "0", "tuesday": "0", "wednesday": "0", "thursday": "0",
+         "friday": "0", "saturday": "1", "sunday": "0", "start_date": "20260801", "end_date": "20261231"},
+    ]
+    trips = sorted({(t["trip_id"], t["route_id"], t["service_id"]) for t in stop_times})
+    tables = {
+        "stops": pd.DataFrame(stops).fillna(""),
+        "routes": pd.DataFrame(routes),
+        "trips": pd.DataFrame(trips, columns=["trip_id", "route_id", "service_id"]),
+        "stop_times": pd.DataFrame(
+            [{k: v for k, v in t.items() if k not in ("route_id", "service_id")} for t in stop_times]
+        ).fillna(""),
+        "calendar": pd.DataFrame(calendar),
+    }
+    if calendar_dates:
+        tables["calendar_dates"] = pd.DataFrame(calendar_dates)
+    return tables
+
+
+def departures(stop_id, times, route_id="r1", service_id="wk", prefix="t", pickup_type="0"):
+    return [
+        {"trip_id": f"{prefix}{i}", "stop_id": stop_id, "departure_time": time, "route_id": route_id,
+         "service_id": service_id, "pickup_type": pickup_type}
+        for i, time in enumerate(times)
+    ]
+
+
+def test_active_services_applies_calendar_dates():
+    gtfs = make_gtfs([], [], calendar_dates=[
+        {"service_id": "wk", "date": "20260907", "exception_type": "2"},  # Labor Day
+        {"service_id": "sat", "date": "20260907", "exception_type": "1"},
+    ])
+    assert ps.active_services(gtfs, "20260916") == {"wk"}
+    assert ps.active_services(gtfs, "20260907") == {"sat"}
+    assert ps.active_services(gtfs, "20270201") == set()
+
+
+def test_stop_service_counts_weekday_pickups_and_am_peak():
+    stop_times = (
+        departures("a", ["06:50:00", "07:00:00", "07:15:00", "07:30:00", "08:45:00", "09:00:00"])
+        + departures("a", ["07:05:00", "08:05:00"], route_id="r2", prefix="x")
+        + departures("a", ["07:10:00"], service_id="sat", prefix="s")  # not on the weekday
+        + departures("a", ["07:20:00"], route_id="dr", prefix="d")  # demand responsive
+        + departures("a", ["07:40:00"], prefix="n", pickup_type="1")  # drop-off only
+        + departures("b", ["25:10:00"], prefix="late")  # after midnight
+    )
+    summary = ps.stop_service(make_gtfs([], stop_times), "20260916")
+    a = summary.loc["a"]
+    assert a["weekday_departures"] == 8
+    # 6 departures between 07:00 and 08:59 over two hours
+    assert a["peak_departures_per_hour"] == 3.0
+    assert a["routes"] == "15, sbX Green Line"
+    assert summary.loc["b", "peak_departures_per_hour"] == 0
+
+
+def test_service_class_thresholds():
+    assert ps.service_class(40, 4.0, "Bus") == ps.TRANSIT_FREQUENT
+    assert ps.service_class(40, 3.5, "Bus") == ps.TRANSIT_MEDIUM
+    assert ps.service_class(40, 2.0, "Bus") == ps.TRANSIT_MEDIUM
+    assert ps.service_class(10, 0.0, "Bus") == ps.TRANSIT_INFREQUENT
+    assert ps.service_class(30, 1.5, "Rail") == ps.TRANSIT_RAIL
+    assert ps.service_class(0, 0.0, "Rail") == ps.TRANSIT_NO_SERVICE
+
+
+def stop(stop_id, x, y, location_type="0", wheelchair="1"):
+    lon_lat = gpd.GeoSeries([Point(x, y)], crs="EPSG:26911").to_crs("EPSG:4326").iloc[0]
+    return {"stop_id": stop_id, "stop_name": f"Stop {stop_id}", "stop_lat": str(lon_lat.y),
+            "stop_lon": str(lon_lat.x), "location_type": location_type, "wheelchair_boarding": wheelchair}
+
+
+def test_select_transit_stops_classifies_and_keeps_context():
+    cities = ps.select_city_boundaries(make_places())
+    bus = make_gtfs(
+        [
+            stop("1", 481_000, 3_769_000),  # Alpha, frequent
+            stop("2", 483_000, 3_769_000, wheelchair="0"),  # Beta, no service
+            stop("3", 484_700, 3_769_000),  # 700 m outside: context
+            stop("4", 485_000, 3_769_000),  # 1 km outside: dropped
+            stop("S", 481_000, 3_769_000, location_type="1"),  # parent station
+        ],
+        departures("1", [f"07:{m:02d}:00" for m in range(0, 60, 10)] + [f"08:{m:02d}:00" for m in range(0, 60, 10)])
+        + departures("3", ["12:00:00"], prefix="c")
+        + departures("4", ["07:00:00"], prefix="f"),
+    )
+    rail = make_gtfs(
+        [{"stop_id": "9", "stop_name": "Alpha Station", **{k: v for k, v in stop("9", 481_500, 3_768_500).items() if k.startswith("stop_l")}}],
+        departures("9", ["07:30:00"], prefix="m"),
+    )
+    stops = ps.select_transit_stops([(bus, "Bus Co", "Bus"), (rail, "Rail Co", "Rail")], cities, "20260916")
+    stops = stops.set_index("stop_key")
+
+    assert sorted(stops.index) == ["bus co:1", "bus co:2", "bus co:3", "rail co:9"]
+    assert stops.loc["bus co:1", "service_class"] == ps.TRANSIT_FREQUENT
+    assert stops.loc["bus co:1", "peak_departures_per_hour"] == 6.0
+    assert stops.loc["bus co:2", "service_class"] == ps.TRANSIT_NO_SERVICE
+    assert not stops.loc["bus co:2", "proximity_eligible"]
+    assert pd.isna(stops.loc["bus co:2", "wheelchair_boarding"])
+    assert stops.loc["bus co:1", "wheelchair_boarding"] == "Yes"
+    assert stops.loc["bus co:3", "study_city"] is None
+    assert stops.loc["rail co:9", ["service_class", "study_city"]].tolist() == [ps.TRANSIT_RAIL, "Alpha"]
+    assert stops["in_study_area"].tolist() == [True, True, False, True]

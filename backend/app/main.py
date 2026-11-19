@@ -2,6 +2,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
 from psycopg import OperationalError
 from psycopg_pool import PoolTimeout
@@ -25,7 +26,7 @@ app = FastAPI(
     title="Community Services Explorer API",
     version="0.1.0",
     description=(
-        "Public schools and public libraries in nine San Bernardino Valley communities "
+        "Public schools, public libraries and transit stops in nine San Bernardino Valley communities "
         "(Colton, Grand Terrace, Highland, Loma Linda, Mentone, Redlands, Rialto, "
         "San Bernardino, Yucaipa), California, with proximity coverage by area and "
         "2020 population (total and aged 5-17). "
@@ -35,6 +36,8 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# GeoJSON compresses well: /facilities shrinks from ~690 KB to ~100 KB
+app.add_middleware(GZipMiddleware, minimum_size=1000)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=CORS_ORIGINS,

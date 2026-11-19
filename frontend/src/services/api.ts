@@ -28,8 +28,22 @@ export interface LibraryAttributes {
   WeeksOpen: number | null
 }
 
+export interface TransitAttributes {
+  Agency: string | null
+  Mode: string | null
+  /** Route names serving the stop, e.g. "1, 15, sbX Green Line" */
+  Routes: string | null
+  /** Departures on the reference weekday (all routes, pickups only) */
+  WeekdayDepartures: number | null
+  /** Average departures per hour, 7–9 am */
+  PeakDeparturesPerHour: number | null
+  WheelchairBoarding: string | null
+}
+
 /** Source-specific fields; which ones are present depends on facility_type */
-export type FacilityAttributes = Partial<SchoolAttributes> & Partial<LibraryAttributes>
+export type FacilityAttributes = Partial<SchoolAttributes> &
+  Partial<LibraryAttributes> &
+  Partial<TransitAttributes>
 
 export interface FacilityProperties {
   id: number

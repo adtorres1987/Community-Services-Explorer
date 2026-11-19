@@ -58,6 +58,22 @@ SOURCES = [
         # Outlet file (locations) and system file (library system names)
         "extract": ["CSV/pls_fy24_outlet_pud24i.csv", "CSV/PLS_FY24_AE_pud24i.csv"],
     },
+    # GTFS feeds: archived copies in the Mobility Database, so the URL and the
+    # checksum stay fixed when the agencies publish a new schedule. Read from the zip.
+    {
+        "name": "Omnitrans GTFS, service from 2026-08-10 (Mobility Database mdb-97)",
+        "url": "https://files.mobilitydatabase.org/mdb-97/mdb-97-202608140125/mdb-97-202608140125.zip",
+        "path": RAW_DIR / "gtfs/omnitrans-mdb-97-202608140125.zip",
+        "sha256": "3ceca513d0e5f640ab2f1f5157184de13a6c9269273f8292e8fad887d4ac145a",
+        "extract": [],
+    },
+    {
+        "name": "Metrolink GTFS, service from 2026-05-05 (Mobility Database mdb-96)",
+        "url": "https://files.mobilitydatabase.org/mdb-96/mdb-96-202605230122/mdb-96-202605230122.zip",
+        "path": RAW_DIR / "gtfs/metrolink-mdb-96-202605230122.zip",
+        "sha256": "d793a08b962f168f33c0e108bc41bf61b9b619b6e4ef72289a9828a28d97932b",
+        "extract": [],
+    },
 ]
 
 
