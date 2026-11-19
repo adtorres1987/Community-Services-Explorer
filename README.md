@@ -3,8 +3,8 @@
 [![CI](https://github.com/adtorres1987/Community-Services-Explorer/actions/workflows/ci.yml/badge.svg)](https://github.com/adtorres1987/Community-Services-Explorer/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-A geospatial web application for exploring public schools and public libraries
-in nine contiguous communities of the **San Bernardino Valley, California** —
+A geospatial web application for exploring public schools, public libraries and
+transit stops in nine contiguous communities of the **San Bernardino Valley, California** —
 Colton, Grand Terrace, Highland, Loma Linda, Mentone, Redlands, Rialto, San
 Bernardino and Yucaipa — and how many residents, and how much land, lie within
 a straight-line radius of one. Built end to end, from raw public data to an
@@ -14,14 +14,20 @@ interactive map: Python data pipeline → PostGIS → FastAPI → React + Leafle
 
 ## Features
 
-- Two services, one at a time: **173 public schools** (plus 32 nearby schools that
-  count toward coverage) and **14 public libraries** (plus 6 nearby), in nine
-  communities with 612,335 residents
+- Three services, one at a time: **173 public schools** (plus 32 nearby schools that
+  count toward coverage), **14 public libraries** (plus 6 nearby) and **1,162 transit
+  stops** — Omnitrans bus and sbX, Metrolink and Arrow rail — (plus 87 nearby), in
+  nine communities with 612,335 residents
+- Transit stops classified by weekday service from the GTFS schedules (frequent
+  bus every 15 min or better, every 20–30 min, less often, rail), so coverage can
+  be shown for frequent transit only
 - Facilities assigned to communities by boundary, not by mailing address
 - Filters by service, by one or several communities and by type; popups with
-  district, grades and enrolment for schools, system, size and opening hours for libraries
+  district, grades and enrolment for schools, system, size and opening hours for
+  libraries, routes and departures for stops
 - Proximity coverage with radii suited to each service — 500 m to 2 km for schools,
-  ½, 1 and 2 miles for libraries — computed in PostGIS and drawn on the map
+  ½, 1 and 2 miles for libraries, ¼ and ½ mile for transit — computed in PostGIS
+  and drawn on the map
 - Coverage by **population** — all residents or **school-age residents (5–17)** — from
   2020 census blocks apportioned by area, and by area
 - Statistics for the selected communities (any combination) with a weighted total, and the method and its limits stated in the UI
@@ -49,8 +55,17 @@ interactive map: Python data pipeline → PostGIS → FastAPI → React + Leafle
 
 ![Public libraries with 2-mile coverage](docs/images/libraries-2mi.jpg)
 
+| Transit | Any stop, ¼ mile (400 m) | Any stop, ½ mile (800 m) | Frequent bus, ¼ mile | Frequent bus, ½ mile |
+|---|---|---|---|---|
+| Residents within | 58.2 % | 85.2 % | 17.6 % | 35.5 % |
+| Ages 5–17 within | 60.5 % | 86.9 % | 19.4 % | 38.2 % |
+| Area within | 31.8 % | 52.8 % | 8.6 % | 18.4 % |
+
+![Frequent bus stops with ¼-mile coverage](docs/images/transit-frequent.jpg)
+
 *Straight-line distance, not travel time; any public school of any type and
-grade level counts, and any central or branch public library. See
+grade level counts, any central or branch public library, and any stop with
+weekday service. See
 [analysis limitations](docs/analysis-limitations.md).*
 
 <p>
@@ -103,7 +118,7 @@ npm run dev
 ### Rebuilding the data from the original sources
 
 ```bash
-python scripts/download_data.py       # schools, libraries, Census boundaries and population (~1.2 GB), checksum-verified
+python scripts/download_data.py       # schools, libraries, transit, Census boundaries and population (~1.2 GB), checksum-verified
 python scripts/prepare_study_area.py  # assign by boundary, add population → data/processed/study_area.gpkg
 python scripts/load_postgis.py
 ```
@@ -165,6 +180,7 @@ docs/           architecture, data sources, database, API, limitations
 | [TIGER/Line 2026 Places, California](https://www2.census.gov/geo/tiger/TIGER2026/PLACE/) | U.S. Census Bureau | Public domain |
 | [TIGER/Line 2020 blocks](https://www2.census.gov/geo/tiger/TIGER2020PL/LAYER/TABBLOCK/2020/), [2020 P.L. 94-171 population](https://www2.census.gov/programs-surveys/decennial/2020/data/01-Redistricting_File--PL_94-171/California/) and [2020 DHC ages](https://www2.census.gov/programs-surveys/decennial/2020/data/demographic-and-housing-characteristics-file/California/) | U.S. Census Bureau | Public domain |
 | [Public Libraries Survey FY 2024](https://www.imls.gov/research-evaluation/surveys/public-libraries-survey-pls) (outlet and system files) | Institute of Museum and Library Services | Public domain (U.S. Government work) |
+| [Omnitrans](https://www.omnitrans.org/google/gis/gis-files-download.html) and [Metrolink](https://metrolinktrains.com/about/gtfs/) GTFS schedules, archived copies from the [Mobility Database](https://mobilitydatabase.org/) | Omnitrans; Southern California Regional Rail Authority | Free downloads; no license stated (see [data sources](docs/data-sources.md)) |
 | Basemap tiles | © [OpenStreetMap](https://www.openstreetmap.org/copyright) contributors | ODbL; [tile usage policy](https://operations.osmfoundation.org/policies/tiles/) |
 
 Field descriptions, checksums and processing criteria: [docs/data-sources.md](docs/data-sources.md).
@@ -182,8 +198,8 @@ Field descriptions, checksums and processing criteria: [docs/data-sources.md](do
 
 ## Next steps
 
-- More community services: transit stops, clinics, parks (each is a data adapter in the
-  pipeline plus an entry in the frontend service registry)
+- More community services: clinics, parks (each is a data adapter in the pipeline
+  plus an entry in the frontend service registry)
 - Network-based accessibility: walking distance and service areas on the street network
 - OGC services (WMS/WFS, OGC API Features) and an ArcGIS Maps SDK comparison
 

@@ -105,6 +105,13 @@ describe('FilterPanel service', () => {
     expect(screen.getByRole('combobox', { name: 'Library type' })).toBeInTheDocument()
   })
 
+  it('offers transit the walking distances to a stop', () => {
+    renderPanel([], true, 'transit')
+    expect(radiusLabels()).toEqual(['Off', '¼ mi', '½ mi'])
+    expect(screen.getByRole('combobox', { name: 'Service level' })).toBeInTheDocument()
+    expect(screen.getByRole('radio', { name: 'Transit' })).toBeChecked()
+  })
+
   it('keeps the school radii in metres', () => {
     renderPanel([])
     expect(radiusLabels()).toEqual(['Off', '500 m', '1 km', '1.5 km', '2 km'])

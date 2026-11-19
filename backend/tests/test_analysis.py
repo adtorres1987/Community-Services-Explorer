@@ -4,6 +4,7 @@ import pytest
 
 SCHOOLS = {"facility_type": "school"}
 LIBRARIES = {"facility_type": "library"}
+TRANSIT = {"facility_type": "transit"}
 
 
 @pytest.mark.parametrize(
@@ -148,6 +149,45 @@ def test_library_totals_at_two_miles(client):
     assert sum(r["covered_population_5_17"] for r in results) == 104430
 
 
+@pytest.mark.parametrize(
+    ("city", "radius_m", "area_pct", "population_pct", "age_5_17_pct", "contributing"),
+    [
+        ("Rialto", 400, 47.3, 68.4, 69.3, 234),
+        ("Grand Terrace", 400, 21.7, 28.2, 24.7, 15),
+        ("Redlands", 800, 33.9, 71.2, 72.5, 147),
+        ("Yucaipa", 800, 37.2, 69.7, 72.1, 62),
+        ("San Bernardino", 800, 65.6, 89.2, 90.3, 707),
+    ],
+)
+def test_transit_coverage_matches_verified_values(
+    client, city, radius_m, area_pct, population_pct, age_5_17_pct, contributing
+):
+    params = {"city": city, "radius_m": radius_m, **TRANSIT}
+    [result] = client.get("/analysis/proximity", params=params).json()["results"]
+    assert result["covered_pct"] == area_pct
+    assert result["covered_population_pct"] == population_pct
+    assert result["covered_population_5_17_pct"] == age_5_17_pct
+    assert result["contributing_facilities"] == contributing
+
+
+@pytest.mark.parametrize(
+    ("subtype", "radius_m", "covered_population"),
+    [
+        (None, 400, 356380),
+        (None, 800, 521647),
+        ("Frequent bus (15 min or better)", 400, 107692),
+        ("Frequent bus (15 min or better)", 800, 217204),
+        ("Rail", 800, 21619),
+    ],
+)
+def test_transit_totals_by_service_level(client, subtype, radius_m, covered_population):
+    params = {"radius_m": radius_m, **TRANSIT}
+    if subtype:
+        params["facility_subtype"] = subtype
+    results = client.get("/analysis/proximity", params=params).json()["results"]
+    assert sum(r["covered_population"] for r in results) == covered_population
+
+
 def test_types_are_analysed_separately(client):
     def contributing(params):
         [result] = client.get(
@@ -155,7 +195,7 @@ def test_types_are_analysed_separately(client):
         ).json()["results"]
         return result["contributing_facilities"]
 
-    assert contributing(SCHOOLS) + contributing({"facility_type": "library"}) == contributing({})
+    assert contributing(SCHOOLS) + contributing(LIBRARIES) + contributing(TRANSIT) == contributing({})
 
 
 @pytest.mark.parametrize("radius_m", [50, 3201, 5000, "abc"])

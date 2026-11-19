@@ -18,9 +18,9 @@ def proximity(
     radius_m: Annotated[int, Query(ge=100, le=3200, description="Radius in metres")],
     city: Annotated[str | None, Query(description="Omit for all cities")] = None,
     facility_type: Annotated[
-        str | None, Query(description="school or library; omit to combine all types")
+        str | None, Query(description="school, library or transit; omit to combine all types")
     ] = None,
-    facility_subtype: Annotated[str | None, Query(description="e.g. Elementary, Branch")] = None,
+    facility_subtype: Annotated[str | None, Query(description="e.g. Elementary, Branch, Rail")] = None,
 ):
     """Share of each city's area within `radius_m` of a proximity-eligible facility."""
     if city is not None and not cities_service.city_exists(conn, city):

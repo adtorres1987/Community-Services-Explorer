@@ -17,6 +17,7 @@ GPKG_PATH = ROOT / "data/processed/study_area.gpkg"
 SRID = 26911
 SCHOOLS_SOURCE = "cde_public_schools_2025_26"
 LIBRARIES_SOURCE = "imls_pls_fy2024_outlets"
+TRANSIT_SOURCE = "gtfs_omnitrans_metrolink"
 BOUNDARIES_SOURCE = "census_tiger_2026_place"
 # Name kept from the first load so re-runs replace those rows; the units now also
 # carry the DHC population aged 5-17
@@ -37,6 +38,16 @@ LIBRARY_ATTRIBUTES = {
     "SquareFeet": "square_feet",
     "AnnualHours": "annual_hours",
     "WeeksOpen": "weeks_open",
+}
+
+
+TRANSIT_ATTRIBUTES = {
+    "Agency": "agency",
+    "Mode": "mode",
+    "Routes": "routes",
+    "WeekdayDepartures": "weekday_departures",
+    "PeakDeparturesPerHour": "peak_departures_per_hour",
+    "WheelchairBoarding": "wheelchair_boarding",
 }
 
 
@@ -61,9 +72,16 @@ load_dotenv(ROOT / ".env")
 
 schools = gpd.read_file(GPKG_PATH, layer="schools")
 libraries = gpd.read_file(GPKG_PATH, layer="libraries")
+transit_stops = gpd.read_file(GPKG_PATH, layer="transit_stops")
 cities = gpd.read_file(GPKG_PATH, layer="city_boundaries")
 units = gpd.read_file(GPKG_PATH, layer="population_units")
-layers = {"schools": schools, "libraries": libraries, "city_boundaries": cities, "population_units": units}
+layers = {
+    "schools": schools,
+    "libraries": libraries,
+    "transit_stops": transit_stops,
+    "city_boundaries": cities,
+    "population_units": units,
+}
 for name, layer in layers.items():
     if layer.crs.to_epsg() != SRID:
         raise ValueError(f"{name} CRS is {layer.crs}, expected EPSG:{SRID}")
@@ -79,7 +97,10 @@ conninfo = psycopg.conninfo.make_conninfo(
 with psycopg.connect(conninfo) as conn, conn.cursor() as cur:
     # Population units reference city boundaries, so they are removed first
     cur.execute("DELETE FROM population_units WHERE source_name = %s", (POPULATION_SOURCE,))
-    cur.execute("DELETE FROM facilities WHERE source_name IN (%s, %s)", (SCHOOLS_SOURCE, LIBRARIES_SOURCE))
+    cur.execute(
+        "DELETE FROM facilities WHERE source_name IN (%s, %s, %s)",
+        (SCHOOLS_SOURCE, LIBRARIES_SOURCE, TRANSIT_SOURCE),
+    )
     cur.execute("DELETE FROM city_boundaries WHERE source_name = %s", (BOUNDARIES_SOURCE,))
 
     cur.executemany(
@@ -139,6 +160,19 @@ with psycopg.connect(conninfo) as conn, conn.cursor() as cur:
             for r in records(libraries)
         ],
     )
+    # GTFS has no addresses: address_city stays NULL
+    cur.executemany(
+        insert_facility,
+        [
+            (
+                r["stop_key"], TRANSIT_SOURCE, r["name"], "transit", r["service_class"],
+                r["study_city"], None, r["in_study_area"], r["proximity_eligible"],
+                Jsonb({key: r[column] for key, column in TRANSIT_ATTRIBUTES.items()}),
+                r["wkb"], SRID,
+            )
+            for r in records(transit_stops)
+        ],
+    )
 
     counts = {}
     for name, table, source in (
@@ -146,6 +180,7 @@ with psycopg.connect(conninfo) as conn, conn.cursor() as cur:
         ("population_units", "population_units", POPULATION_SOURCE),
         ("schools", "facilities", SCHOOLS_SOURCE),
         ("libraries", "facilities", LIBRARIES_SOURCE),
+        ("transit_stops", "facilities", TRANSIT_SOURCE),
     ):
         cur.execute(f"SELECT count(*) FROM {table} WHERE source_name = %s", (source,))
         counts[name] = cur.fetchone()[0]

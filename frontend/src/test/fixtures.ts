@@ -69,6 +69,34 @@ export function makeLibrary(overrides: Partial<FacilityProperties> = {}): Facili
   }
 }
 
+export function makeStop(overrides: Partial<FacilityProperties> = {}): Facility {
+  const properties: FacilityProperties = {
+    id: 2001,
+    name: 'San Bernardino - Downtown',
+    facility_type: 'transit',
+    facility_subtype: 'Rail',
+    city: 'San Bernardino',
+    address_city: null,
+    in_study_area: true,
+    proximity_eligible: true,
+    attributes: {
+      Agency: 'Metrolink',
+      Mode: 'Rail',
+      Routes: 'IE-OC Line, SB Line',
+      WeekdayDepartures: 86,
+      PeakDeparturesPerHour: 5,
+      WheelchairBoarding: null,
+    },
+    ...overrides,
+  }
+  return {
+    type: 'Feature',
+    id: properties.id,
+    geometry: { type: 'Point', coordinates: [-117.296, 34.0995] },
+    properties,
+  }
+}
+
 export function makeResult(overrides: Partial<CityProximity> = {}): CityProximity {
   return {
     city: 'Redlands',

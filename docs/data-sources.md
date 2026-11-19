@@ -166,6 +166,36 @@ legal survey boundaries. CDP boundaries are statistical, not administrative.
   FSCS public library definition), e.g. the Law Library for San Bernardino
   County in downtown San Bernardino. They are excluded.
 
+## Transit schedules — Omnitrans and Metrolink GTFS
+
+| Item | Omnitrans | Metrolink |
+|---|---|---|
+| Publisher | Omnitrans | Southern California Regional Rail Authority (Metrolink) |
+| Agency URL | http://www.omnitrans.org/google/google_transit.zip | https://metrolinktrains.com/globalassets/about/gtfs/gtfs.zip |
+| Archived copy used | https://files.mobilitydatabase.org/mdb-97/mdb-97-202608140125/mdb-97-202608140125.zip | https://files.mobilitydatabase.org/mdb-96/mdb-96-202605230122/mdb-96-202605230122.zip |
+| SHA-256 (zip) | `3ceca513d0e5f640ab2f1f5157184de13a6c9269273f8292e8fad887d4ac145a` | `d793a08b962f168f33c0e108bc41bf61b9b619b6e4ef72289a9828a28d97932b` |
+| Feed version | `20260810_20260710a`, service 2026-08-10 to 2027-01-03 | `20260505`, service from 2026-05-05 |
+| Terms | Free download; the agency says it provides data "under certain terms and conditions" but does not list them | Free download, no registration for the static feed; no license or terms stated |
+| Downloaded | 2026-11-18 | 2026-11-18 |
+| Local files | `data/raw/gtfs/` (not committed; read straight from the zips) | |
+
+- **Terms.** Neither agency publishes a license for its static GTFS feed
+  (checked 2026-11-18). The app uses stop locations and schedule counts derived
+  from the feeds, with attribution; for wider redistribution, ask the agencies
+  (Omnitrans: planning@omnitrans.org).
+- **Why archived copies.** Agency URLs always serve the current schedule, so
+  their content (and checksum) changes with every service change. The
+  [Mobility Database](https://mobilitydatabase.org/) keeps each version at a
+  fixed URL. The Omnitrans copy is byte-identical to the agency file of
+  2026-11-18; the Metrolink copy has the same feed version as the agency file
+  but was repackaged by Metrolink after the archive was made.
+- **Omnitrans** runs 17 fixed routes in the study area, including the sbX Green
+  Line (bus rapid transit). OmniRide (route type 715) is demand-responsive with
+  no fixed stops and is excluded. Parent stations (`location_type = 1`) are
+  dropped; their boarding platforms are kept.
+- **Metrolink** includes the Arrow service to Redlands within the San
+  Bernardino Line; 7 stations are in the study area.
+
 ## Processing (`scripts/prepare_study_area.py`)
 
 Writes `data/processed/study_area.gpkg` (EPSG:26911), committed to the repository.
@@ -195,13 +225,26 @@ Writes `data/processed/study_area.gpkg` (EPSG:26911), committed to the repositor
    "656 N. 9th St."); negative PLS codes for missing numbers (−1, −3, −9)
    become empty.
 
+**Transit stops**
+
+8. Weekday service on a reference date, **Wednesday 16 September 2026** (inside
+   both feeds' service periods, no holiday), from `calendar` and
+   `calendar_dates`. Departures count trips that pick up passengers
+   (`pickup_type` ≠ 1), all routes and directions at the stop.
+9. Service level from AM-peak departures per hour (07:00–08:59): **Frequent
+   bus** 4 or more (every 15 min or better), **every 20–30 min** 2 to 3.5,
+   **less often** under 2; Metrolink stations are **Rail**. Stops with no
+   departures on the reference date are kept but not proximity eligible.
+10. Assign by boundary, and keep context stops within 800 m (½ mile, the
+    largest radius offered for transit).
+
 **Population**
 
-8. Clip 2020 blocks to the study places. A block split by a boundary gets
+11. Clip 2020 blocks to the study places. A block split by a boundary gets
    population in proportion to the area on each side (2020 blocks do not nest
    exactly in 2026 boundaries; 344 blocks are split).
-9. Ages 5–17 (DHC) are apportioned the same way, block by block.
-10. Simplify the clipped blocks with a 1 m tolerance *after* computing
+12. Ages 5–17 (DHC) are apportioned the same way, block by block.
+13. Simplify the clipped blocks with a 1 m tolerance *after* computing
    population, to keep the committed file small (~0.003 % area change).
 
 **Working CRS:** EPSG:26911 (NAD83 / UTM zone 11N, metres). EPSG:3857 is not
@@ -213,6 +256,12 @@ suitable for distance measurement (≈0.83 true metres per unit at 34°N).
 |---|---|---|
 | `schools` | 205 | 173 in the study area + 32 context; 7 not proximity eligible |
 | `libraries` | 20 | 14 in the study area + 6 context |
+| `transit_stops` | 1,249 | 1,162 in the study area (1,155 bus stops, 7 rail stations) + 87 context bus stops |
+
+Transit stops in the study area by service level: frequent bus 238, every
+20–30 min 445, less often 472, rail 7. By place: San Bernardino 554, Rialto
+197, Redlands 99, Colton 93, Highland 71, Yucaipa 60, Loma Linda 55, Mentone
+20, Grand Terrace 13.
 | `city_boundaries` | 9 | With 2020 `population` and `population_5_17` |
 | `population_units` | 6,839 | 6,487 blocks clipped to places, apportioned `population` and `population_5_17` |
 
@@ -257,7 +306,7 @@ Riverside County). `tests/test_processed_data.py` checks these values.
 - **Library names are truncated in the source** at 60 characters: "Highland Sam
   J. Racadio Library and Environmental Learning C[enter]".
 - **Population is from 2020**, boundaries from 2026, schools from 2025–26 and
-  libraries from fiscal year 2024.
+  libraries from fiscal year 2024, transit schedules from autumn 2026.
 
 ## Earlier scope (Redlands and Yucaipa)
 

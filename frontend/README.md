@@ -28,7 +28,7 @@ src/
 ├── components/   MapView, FilterPanel, StatisticsPanel, FacilityPopup, Legend
 ├── features/facilities/
 │   ├── services.ts             service registry: labels, colours, radii, caveat per service
-│   ├── schools.ts, libraries.ts  service-specific categories, colours and labels
+│   ├── schools.ts, libraries.ts, transit.ts  service-specific categories, colours and labels
 │   ├── filters.ts              community / subtype selection and focus
 │   └── coverage.ts             combines per-place results (weighted totals)
 ├── maps/basemap.ts             basemap and layer styles
@@ -43,8 +43,8 @@ Tests sit next to the code they cover (`*.test.ts`, `*.test.tsx`).
 
 ## Notes
 
-- One service at a time ("Service": Schools / Libraries). Facilities of every
-  type are loaded once (~225 records) and filtered in the browser; the
+- One service at a time ("Service": Schools / Libraries / Transit). Facilities of
+  every type are loaded once (~1,475 records, ~46 KB gzip-compressed) and filtered in the browser; the
   proximity analysis is requested from the API for each service, radius and
   subtype. Each service has its own radii (`services.ts`); switching service
   keeps the coverage on at the new service's closest radius.
@@ -65,6 +65,8 @@ Tests sit next to the code they cover (`*.test.ts`, `*.test.tsx`).
 - Basemap: OpenStreetMap standard tiles, desaturated in CSS. They are for light
   use under the [OSM tile usage policy](https://operations.osmfoundation.org/policies/tiles/);
   a public deployment with real traffic should use a tile provider with a key.
+- Transit stops use smaller markers (`marker` in `services.ts`) so ~1,250 stops
+  do not hide the coverage.
 - Marker colours use the Okabe–Ito palette. Exclusively virtual schools are
   drawn hollow because they are excluded from the proximity analysis.
 - The map uses fractional zoom (`zoomSnap` 0.25) so the study area fills

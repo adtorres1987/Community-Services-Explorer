@@ -1,6 +1,8 @@
 import type { FacilityProperties } from '../services/api'
 import { gradeRange, virtualLabel } from '../features/facilities/schools'
 import { floorArea, openingHours } from '../features/facilities/libraries'
+import { SERVICES, type ServiceType } from '../features/facilities/services'
+import { peakFrequency } from '../features/facilities/transit'
 
 interface Props {
   facility: FacilityProperties
@@ -42,9 +44,43 @@ function LibraryDetails({ facility }: Props) {
   )
 }
 
+function TransitDetails({ facility }: Props) {
+  const { attributes } = facility
+  return (
+    <>
+      <dt>Agency</dt>
+      <dd>{attributes.Agency ?? '—'}</dd>
+      <dt>Routes</dt>
+      <dd>{attributes.Routes || '—'}</dd>
+      <dt>Weekday</dt>
+      <dd>
+        {attributes.WeekdayDepartures != null
+          ? `${attributes.WeekdayDepartures.toLocaleString('en-US')} departures`
+          : '—'}
+      </dd>
+      <dt>Peak</dt>
+      <dd>{peakFrequency(facility) ?? '—'}</dd>
+      <dt>Wheelchair</dt>
+      <dd>{attributes.WheelchairBoarding ?? 'No information'}</dd>
+    </>
+  )
+}
+
+function subtitle(facility: FacilityProperties) {
+  switch (facility.facility_type) {
+    case 'library':
+      return `${facility.facility_subtype ?? 'Public'} library`
+    case 'transit':
+      return `${facility.attributes.Mode === 'Rail' ? 'Rail station' : 'Bus stop'} · ${facility.facility_subtype ?? ''}`
+    default:
+      return facility.facility_subtype ?? 'School'
+  }
+}
+
 export function FacilityPopup({ facility }: Props) {
   const isSchool = facility.facility_type === 'school'
-  const noun = isSchool ? 'school' : 'library'
+  const service = SERVICES[facility.facility_type as ServiceType] ?? SERVICES.school
+  const noun = service.singular
   const grades = isSchool ? gradeRange(facility) : null
   const website =
     facility.attributes.Website && /^https?:\/\//i.test(facility.attributes.Website)
@@ -55,13 +91,19 @@ export function FacilityPopup({ facility }: Props) {
     <div className="facility-popup">
       <h3>{facility.name}</h3>
       <p className="facility-popup__subtitle">
-        {isSchool ? (facility.facility_subtype ?? 'School') : `${facility.facility_subtype ?? 'Public'} library`}
+        {subtitle(facility)}
         {grades && ` · Grades ${grades}`}
       </p>
       <dl>
         <dt>Located in</dt>
         <dd>{facility.city ?? 'Outside the study area'}</dd>
-        {isSchool ? <SchoolDetails facility={facility} /> : <LibraryDetails facility={facility} />}
+        {facility.facility_type === 'library' ? (
+          <LibraryDetails facility={facility} />
+        ) : facility.facility_type === 'transit' ? (
+          <TransitDetails facility={facility} />
+        ) : (
+          <SchoolDetails facility={facility} />
+        )}
       </dl>
       {!facility.in_study_area && (
         <p className="facility-popup__note">
@@ -69,17 +111,14 @@ export function FacilityPopup({ facility }: Props) {
           their proximity coverage; not included in {noun} counts.
         </p>
       )}
-      {facility.in_study_area && facility.address_city !== facility.city && (
+      {facility.in_study_area && facility.address_city && facility.address_city !== facility.city && (
         <p className="facility-popup__note">
           The mailing address says {facility.address_city}, but the {noun} is inside the{' '}
           {facility.city} boundary.
         </p>
       )}
-      {!facility.proximity_eligible && (
-        <p className="facility-popup__note">
-          Exclusively virtual: this is an administrative address, so the school is excluded from
-          the proximity analysis.
-        </p>
+      {!facility.proximity_eligible && service.excluded && (
+        <p className="facility-popup__note">{service.excluded.popup}</p>
       )}
       {website && (
         <a href={website} target="_blank" rel="noreferrer">

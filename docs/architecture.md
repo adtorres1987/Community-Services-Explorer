@@ -3,6 +3,7 @@
 ```text
  CDE schools GeoJSON ───────┐
  IMLS library outlets ──────┤
+ Omnitrans + Metrolink GTFS ┤
  TIGER/Line 2026 places ────┤
  TIGER/Line 2020 blocks ────┼─ scripts/download_data.py ─► data/raw/ (not committed)
  Census 2020 P.L. 94-171 ───┤
@@ -54,7 +55,8 @@
 - **Assignment by boundary, not address.** Facilities belong to the place that
   contains them; mailing-address cities include neighbourhoods and typos.
 - **No edge effect.** Facilities up to the largest radius offered for their
-  service outside the study area (2 km for schools, 3.2 km for libraries) are
+  service outside the study area (2 km for schools, 3.2 km for libraries,
+  800 m for transit) are
   loaded as context so coverage near boundaries is complete.
 - **Population as well as area.** Area coverage alone misleads where land is
   hills or open space; residents are estimated from 2020 census blocks.
@@ -65,7 +67,13 @@
   service registry (`features/facilities/services.ts`) holds each service's
   labels, colours, radii and caveat; the pipeline has one selection function
   per source and a shared `assign_to_places`. Radii follow each service's
-  planning conventions (metres for schools, miles for libraries).
+  planning conventions (metres for schools, miles for libraries and transit).
+- **Service level from schedules, computed once.** Transit stops are
+  classified in the pipeline from GTFS (AM-peak departures per hour on a
+  reference weekday) and stored as `facility_subtype`, so "frequent transit"
+  coverage uses the same subtype filter as school types; the API never reads GTFS.
+- **Compressed responses.** FastAPI's gzip middleware cuts GeoJSON responses
+  by ~85 %.
 - **Flags instead of deletions.** Context and virtual schools stay in the data
   with `in_study_area` / `proximity_eligible` flags, so every exclusion is
   visible and explainable.

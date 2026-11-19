@@ -2,7 +2,7 @@
 
 The proximity analysis answers a narrow question: *what share of each
 community's residents, and of its area, lies within a straight-line radius of
-a public school, or of a public library?* It is easy to read more into the result than it supports.
+a public school, a public library or a transit stop?* It is easy to read more into the result than it supports.
 These are the known limitations.
 
 ## What the radius does not measure
@@ -73,11 +73,25 @@ These are the known limitations.
   3.2 km), as is usual in US library planning; they are not comparable with
   the school radii. Libraries up to 3.2 km outside the study area count, so
   there is no edge effect at the largest radius either.
+- **Transit: a stop nearby is not a useful trip.** Coverage says a stop is
+  within walking distance, not that its routes go where people need to go.
+  "Any stop" includes stops with one bus an hour; the frequent-bus filter
+  (4+ departures per hour at the stop, 7–9 am) is the stricter measure. The
+  service level counts all routes and both directions at a stop, so a stop
+  served by two hourly routes counts as two departures per hour.
+- **Transit: one weekday, one schedule version.** Service is measured on
+  Wednesday 16 September 2026 from the autumn 2026 schedules; weekends,
+  evenings and later service changes differ. Stops are boarding points, so
+  both sides of a street are usually two stops.
+- **Transit: Omnitrans and Metrolink only.** Other operators that reach the
+  edges of the study area (e.g. Riverside Transit Agency, Mountain Transit)
+  and OmniRide demand-responsive service are not included.
 
 ## Source and method details
 
 - **Snapshot in time.** Sources were downloaded between 2026-11-02 and
-  2026-11-18 (library data are for fiscal year 2024);
+  2026-11-18 (library data are for fiscal year 2024, transit schedules for
+  autumn 2026);
   `scripts/download_data.py` detects later changes by checksum.
 - **TIGER/Line boundaries are cartographic,** intended for statistical use,
   not legal boundary determination.
